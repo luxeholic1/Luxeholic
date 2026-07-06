@@ -434,8 +434,8 @@ function mask(str) {
 // ── DYNAMIC STORE CONFIG ─────────────────────────────────────────────────────
 const DEFAULT_WOO_URLS = {
   IN: 'https://store.luxeholic.in',
-  AU: 'https://au.luxeholic.in',
-  NZ: 'https://nz.luxeholic.in',
+  AU: 'https://store.luxeholic.com.au',
+  NZ: 'https://store.luxeholic.co.nz',
 };
 
 let wooCategoryCache = { expiresAt: 0, bySlug: new Map(), ordered: [] };

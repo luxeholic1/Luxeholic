@@ -3,8 +3,8 @@
 // Luxeholic has three separate frontend domains, one per region (same pattern
 // as Luxtronics), each calling its own WooCommerce backend subdomain:
 //   luxeholic.in      (India frontend)      -> store.luxeholic.in (backend)
-//   luxeholic.com.au  (Australia frontend)  -> au.luxeholic.in    (backend)
-//   luxeholic.co.nz   (New Zealand frontend)-> nz.luxeholic.in    (backend)
+//   luxeholic.com.au  (Australia frontend)  -> store.luxeholic.com.au    (backend)
+//   luxeholic.co.nz   (New Zealand frontend)-> store.luxeholic.co.nz    (backend)
 
 export interface StoreConfig {
   currency: string;
@@ -34,28 +34,28 @@ const STORE_CONFIG: Record<string, StoreConfig> = {
     symbol: 'A$',
     country: 'AU',
     label: 'Australia',
-    apiUrl: 'https://au.luxeholic.in/wp-json/wc/v3',
+    apiUrl: 'https://store.luxeholic.com.au/wp-json/wc/v3',
   },
   'www.luxeholic.com.au': {
     currency: 'AUD',
     symbol: 'A$',
     country: 'AU',
     label: 'Australia',
-    apiUrl: 'https://au.luxeholic.in/wp-json/wc/v3',
+    apiUrl: 'https://store.luxeholic.com.au/wp-json/wc/v3',
   },
   'luxeholic.co.nz': {
     currency: 'NZD',
     symbol: 'NZ$',
     country: 'NZ',
     label: 'New Zealand',
-    apiUrl: 'https://nz.luxeholic.in/wp-json/wc/v3',
+    apiUrl: 'https://store.luxeholic.co.nz/wp-json/wc/v3',
   },
   'www.luxeholic.co.nz': {
     currency: 'NZD',
     symbol: 'NZ$',
     country: 'NZ',
     label: 'New Zealand',
-    apiUrl: 'https://nz.luxeholic.in/wp-json/wc/v3',
+    apiUrl: 'https://store.luxeholic.co.nz/wp-json/wc/v3',
   },
 };
 

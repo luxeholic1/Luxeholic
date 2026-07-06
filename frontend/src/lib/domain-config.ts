@@ -1,6 +1,6 @@
 // Domain to country mapping for multidomain setup.
 // luxeholic.in / luxeholic.com.au / luxeholic.co.nz are the three frontend
-// domains; store.luxeholic.in / au.luxeholic.in / nz.luxeholic.in are backend
+// domains; store.luxeholic.in / store.luxeholic.com.au / store.luxeholic.co.nz are backend
 // WooCommerce subdomains only — a browser never visits those directly, so
 // they don't belong in this hostname-detection map.
 export const DOMAIN_CONFIG = {

@@ -56,8 +56,8 @@ export interface CheckoutCustomerData {
  *
  * The checkout URL is automatically determined based on the current domain:
  * - luxeholic.in      → store.luxeholic.in
- * - luxeholic.com.au  → au.luxeholic.in
- * - luxeholic.co.nz   → nz.luxeholic.in
+ * - luxeholic.com.au  → store.luxeholic.com.au
+ * - luxeholic.co.nz   → store.luxeholic.co.nz
  */
 export function redirectToWooCheckout(
   items: CartLineItem[],
