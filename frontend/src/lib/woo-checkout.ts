@@ -1,0 +1,110 @@
+/**
+ * woo-checkout.ts
+ * Builds the WooCommerce checkout redirect URL so the React frontend
+ * can hand off to the WordPress/WooCommerce payment flow on the
+ * appropriate store based on the current domain.
+ */
+
+import { getStoreConfig } from '@/config/storeConfig';
+
+// Get store-specific WooCommerce base URL — read at call time (not import
+// time), since the region can be refined shortly after initial page load.
+function getWooBase(): string {
+  return getStoreConfig().apiUrl.replace('/wp-json/wc/v3', '');
+}
+
+export interface CartLineItem {
+  /** WooCommerce product ID (numeric) */
+  product_id: number;
+  quantity: number;
+  variation_id?: number;
+}
+
+export interface CheckoutCustomerData {
+  billing?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    phone?: string;
+    address_1?: string;
+    city?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
+  };
+  shipping?: {
+    first_name?: string;
+    last_name?: string;
+    address_1?: string;
+    city?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
+  };
+}
+
+/**
+ * Redirects the browser to the WooCommerce checkout page for the current store.
+ *
+ * Strategy:
+ *  1. For a single product ("Buy Now") → use WooCommerce's
+ *     add-to-cart + redirect-to-checkout shortcut:
+ *     /?add-to-cart=<id>&quantity=<qty>&return_to=checkout
+ *
+ *  2. For multiple items (full cart) → link directly to
+ *     /checkout/ with source_domain + currency + customer data.
+ *
+ * The checkout URL is automatically determined based on the current domain:
+ * - luxeholic.in      → store.luxeholic.in
+ * - luxeholic.com.au  → au.luxeholic.in
+ * - luxeholic.co.nz   → nz.luxeholic.in
+ */
+export function redirectToWooCheckout(
+  items: CartLineItem[],
+  sourceDomain: string,
+  currency: string,
+  customerData?: CheckoutCustomerData
+): void {
+  if (items.length === 0) return;
+
+  let url: string;
+
+  if (items.length === 1 && !customerData) {
+    // ── Single product (Buy Now) ──────────────────────────────────────────
+    // WooCommerce native: ?add-to-cart=ID&quantity=N
+    // Works on ANY WP page. WC adds to session cart then redirects.
+    // We use the shop page as the landing page so WC session is active.
+    const { product_id, quantity, variation_id } = items[0];
+    const params = new URLSearchParams({
+      'add-to-cart': String(product_id),
+      'quantity':    String(quantity),
+    });
+    if (variation_id) params.set('variation_id', String(variation_id));
+
+    // Use shop page — WC always processes add-to-cart here
+    url = `${getWooBase()}/shop/?${params.toString()}`;
+
+  } else {
+    // ── Multi-item (Cart → Proceed to Checkout) ───────────────────────────
+    // Custom param — WordPress snippet (WORDPRESS_CART_SNIPPET.php) reads
+    // lux_cart, empties WC cart, adds all items, redirects to /checkout/
+    const params = new URLSearchParams({
+      'lux_cart': JSON.stringify(items),
+    });
+    if (customerData?.billing) {
+      params.set('lux_customer', JSON.stringify(customerData));
+    }
+    url = `${getWooBase()}/?${params.toString()}`;
+  }
+
+  window.location.href = url;
+}
+
+/**
+ * Returns the WooCommerce cart page URL for viewing the cart
+ * (without immediately going to checkout).
+ */
+export function getWooCartUrl(sourceDomain: string, currency: string): string {
+  const params = new URLSearchParams({ source_domain: sourceDomain, currency });
+  return `${getWooBase()}/cart/?${params.toString()}`;
+}

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+
+  <!-- ── Australia (au.luxeholic.in) — submit to au.luxeholic.in Search Console ── -->
+
+  <url>
+    <loc>https://au.luxeholic.in/</loc>
+    <xhtml:link rel="alternate" hreflang="en-au"      href="https://au.luxeholic.in/"/>
+    <xhtml:link rel="alternate" hreflang="en-in"      href="https://luxeholic.in/"/>
+    <xhtml:link rel="alternate" hreflang="en-nz"      href="https://nz.luxeholic.in/"/>
+    <xhtml:link rel="alternate" hreflang="x-default"  href="https://luxeholic.in/"/>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <url>
+    <loc>https://au.luxeholic.in/shop</loc>
+    <xhtml:link rel="alternate" hreflang="en-au"      href="https://au.luxeholic.in/shop"/>
+    <xhtml:link rel="alternate" hreflang="en-in"      href="https://luxeholic.in/shop"/>
+    <xhtml:link rel="alternate" hreflang="en-nz"      href="https://nz.luxeholic.in/shop"/>
+    <xhtml:link rel="alternate" hreflang="x-default"  href="https://luxeholic.in/shop"/>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>https://au.luxeholic.in/categories</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://au.luxeholic.in/about</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <url>
+    <loc>https://au.luxeholic.in/blog</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://au.luxeholic.in/contact</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <url>
+    <loc>https://au.luxeholic.in/faq</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <url>
+    <loc>https://au.luxeholic.in/shipping-returns</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <url>
+    <loc>https://au.luxeholic.in/payment-method</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.45</priority>
+  </url>
+
+  <url>
+    <loc>https://au.luxeholic.in/return-exchange</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.55</priority>
+  </url>
+
+  <url>
+    <loc>https://au.luxeholic.in/return-policy</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.55</priority>
+  </url>
+
+  <url>
+    <loc>https://au.luxeholic.in/privacy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+  <url>
+    <loc>https://au.luxeholic.in/terms</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+</urlset>

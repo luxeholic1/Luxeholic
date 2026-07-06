@@ -1,0 +1,211 @@
+const PRIMARY_SITE_URL = "https://luxeholic.in";
+
+const SITE_URLS: Record<string, string> = {
+  "luxeholic.in": "https://luxeholic.in",
+  "www.luxeholic.in": "https://luxeholic.in",
+  "luxeholic.com.au": "https://luxeholic.com.au",
+  "www.luxeholic.com.au": "https://luxeholic.com.au",
+  "luxeholic.co.nz": "https://luxeholic.co.nz",
+  "www.luxeholic.co.nz": "https://luxeholic.co.nz",
+};
+
+export const MARKET_CURRENCY: Record<string, string> = {
+  IN: "INR",
+  AU: "AUD",
+  NZ: "NZD",
+};
+
+const MARKET_COUNTRIES = ["IN", "AU", "NZ"] as const;
+
+const DAY_UNIT = "DAY";
+
+const servicePeriod = (minValue: number, maxValue: number) => ({
+  "@type": "ServicePeriod",
+  businessDays: [
+    "https://schema.org/Monday",
+    "https://schema.org/Tuesday",
+    "https://schema.org/Wednesday",
+    "https://schema.org/Thursday",
+    "https://schema.org/Friday",
+  ],
+  duration: {
+    "@type": "QuantitativeValue",
+    minValue,
+    maxValue,
+    unitCode: DAY_UNIT,
+  },
+});
+
+const shippingTransitWindow = (countryCode: string) => {
+  if (countryCode === "IN") return { minValue: 3, maxValue: 7 };
+  return { minValue: 3, maxValue: 5 };
+};
+
+const shippingDeliveryTime = (countryCode: string) => {
+  const transit = shippingTransitWindow(countryCode);
+  return ({
+  "@type": "ShippingDeliveryTime",
+  handlingTime: {
+    "@type": "QuantitativeValue",
+    minValue: 0,
+    maxValue: 2,
+    unitCode: DAY_UNIT,
+  },
+  transitTime: {
+    "@type": "QuantitativeValue",
+    minValue: transit.minValue,
+    maxValue: transit.maxValue,
+    unitCode: DAY_UNIT,
+  },
+});
+};
+
+const toPlainNumber = (value: unknown) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value !== "string") return 0;
+
+  const normalized = value
+    .replace(/,/g, "")
+    .replace(/[^\d.-]/g, "")
+    .trim();
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+export const toSchemaPrice = (value: unknown) => {
+  const safeValue = toPlainNumber(value);
+  return safeValue.toFixed(2);
+};
+
+export const toSchemaInteger = (value: unknown) => Math.max(0, Math.round(toPlainNumber(value)));
+
+const returnWindowDays = (countryCode: string) => (countryCode === "IN" ? 7 : 5);
+
+export const merchantReturnPolicySchema = (countryCode: string) => ({
+  "@type": "MerchantReturnPolicy",
+  "@id": `${getSiteUrl()}/return-exchange#return-policy-${countryCode.toLowerCase()}`,
+  applicableCountry: countryCode,
+  returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+  merchantReturnDays: returnWindowDays(countryCode),
+  returnMethod: "https://schema.org/ReturnByMail",
+  returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+  refundType: "https://schema.org/FullRefund",
+  merchantReturnLink: `${getSiteUrl()}/return-exchange`,
+});
+
+export const shippingServiceSchema = (countryCode: string) => ({
+  "@type": "ShippingService",
+  "@id": `${getSiteUrl()}/shipping-returns#standard-shipping-${countryCode.toLowerCase()}`,
+  name: `Standard shipping - ${countryCode}`,
+  description: "Standard delivery for eligible Luxeholic orders. Final charges are shown before payment.",
+  fulfillmentType: "https://schema.org/FulfillmentTypeDelivery",
+  handlingTime: servicePeriod(0, 2),
+  shippingConditions: {
+    "@type": "ShippingConditions",
+    shippingDestination: {
+      "@type": "DefinedRegion",
+      addressCountry: countryCode,
+    },
+    transitTime: servicePeriod(shippingTransitWindow(countryCode).minValue, shippingTransitWindow(countryCode).maxValue),
+  },
+});
+
+export const offerShippingDetailsSchema = ({
+  countryCode,
+  currency,
+  maxShippingValue,
+}: {
+  countryCode: string;
+  currency: string;
+  maxShippingValue: number;
+}) => ({
+  "@type": "OfferShippingDetails",
+  shippingDestination: {
+    "@type": "DefinedRegion",
+    addressCountry: countryCode,
+  },
+  shippingRate: {
+    "@type": "MonetaryAmount",
+    currency,
+    maxValue: toSchemaPrice(maxShippingValue),
+  },
+  deliveryTime: shippingDeliveryTime(countryCode),
+});
+
+export const offerReturnPolicyReference = (countryCode: string) => ({
+  "@id": `${getSiteUrl()}/return-exchange#return-policy-${countryCode.toLowerCase()}`,
+});
+
+export const getSiteUrl = () => {
+  if (typeof window === "undefined") return PRIMARY_SITE_URL;
+  return SITE_URLS[window.location.hostname] ?? PRIMARY_SITE_URL;
+};
+
+export const absoluteUrl = (path?: string | null) => {
+  const safePath = path || "/";
+  if (/^https?:\/\//i.test(safePath)) return safePath;
+  const normalizedPath = safePath.startsWith("/") ? safePath : `/${safePath}`;
+  return `${getSiteUrl()}${normalizedPath}`;
+};
+
+export const cleanText = (value = "", maxLength = 160) => {
+  const text = value
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 1).trim()}…`;
+};
+
+export const organizationSchema = () => ({
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "@id": `${getSiteUrl()}/#organization`,
+  name: "Luxeholic",
+  url: getSiteUrl(),
+  logo: `${getSiteUrl()}/logo.jpeg`,
+  contactPoint: {
+    "@type": "ContactPoint",
+    telephone: "+91-92664-33722",
+    contactType: "customer support",
+    areaServed: ["IN", "AU", "NZ"],
+    availableLanguage: ["en"],
+  },
+  sameAs: [
+    "https://luxeholic.in",
+    "https://luxeholic.com.au",
+    "https://luxeholic.co.nz",
+  ],
+  hasMerchantReturnPolicy: MARKET_COUNTRIES.map((countryCode) => merchantReturnPolicySchema(countryCode)),
+  hasShippingService: MARKET_COUNTRIES.map((countryCode) => shippingServiceSchema(countryCode)),
+});
+
+export const websiteSchema = (description: string) => ({
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "@id": `${getSiteUrl()}/#website`,
+  name: "Luxeholic",
+  url: getSiteUrl(),
+  description,
+  inLanguage: "en",
+  publisher: {
+    "@id": `${getSiteUrl()}/#organization`,
+  },
+  potentialAction: {
+    "@type": "SearchAction",
+    target: `${getSiteUrl()}/shop?q={search_term_string}`,
+    "query-input": "required name=search_term_string",
+  },
+});
+
+export const breadcrumbSchema = (items: Array<{ name: string; path: string }>) => ({
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: items.map((item, index) => ({
+    "@type": "ListItem",
+    position: index + 1,
+    name: item.name,
+    item: absoluteUrl(item.path),
+  })),
+});

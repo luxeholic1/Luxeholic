@@ -1,0 +1,2053 @@
+// Must run before any async I/O (dns/fs/crypto) touches libuv's threadpool —
+// this account's host caps total OS threads low enough that Node's own
+// startup threads plus a couple of these were enough to hit the cap and
+// crash with "uv_thread_create failed". --v8-pool-size can't be set from
+// here (V8 is already initialized by the time this file runs); set it via
+// NODE_OPTIONS in the hosting environment instead.
+process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || '1';
+
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import path from 'path';
+import { existsSync, readdirSync, readFileSync, mkdirSync } from 'fs';
+import { fileURLToPath } from 'url';
+import multer from 'multer';
+import { PDFParse } from 'pdf-parse';
+import { JSDOM } from 'jsdom';
+import createDOMPurify from 'dompurify';
+
+const purifyWindow = new JSDOM('').window;
+const DOMPurify = createDOMPurify(purifyWindow);
+const BLOG_HTML_ALLOWED_TAGS = [
+  'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'img',
+  'div', 'span', 'blockquote', 'figure', 'figcaption', 'hr', 'pre', 'code',
+];
+const BLOG_HTML_ALLOWED_ATTR = ['href', 'target', 'rel', 'src', 'alt', 'class', 'style', 'width', 'height', 'colspan', 'rowspan'];
+
+function sanitizeBlogHtml(html) {
+  return DOMPurify.sanitize(html || '', { ALLOWED_TAGS: BLOG_HTML_ALLOWED_TAGS, ALLOWED_ATTR: BLOG_HTML_ALLOWED_ATTR });
+}
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+import { MongoClient, ObjectId } from 'mongodb';
+
+for (const file of ['.env', '.env.local', '.env.india']) {
+  dotenv.config({ path: path.join(__dirname, file), override: false });
+}
+
+const app = express();
+const port = parseInt(process.env.PORT || '3001', 10);
+const BUILD_DIR = path.join(__dirname, 'build');
+const ALLOWED_ORIGINS = new Set([
+  'https://luxeholic.in',
+  'https://www.luxeholic.in',
+  'https://luxeholic.com.au',
+  'https://www.luxeholic.com.au',
+  'https://luxeholic.co.nz',
+  'https://www.luxeholic.co.nz',
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://localhost:3001',
+]);
+const rateBuckets = new Map();
+
+function isAllowedOrigin(origin = '') {
+  return !origin || ALLOWED_ORIGINS.has(origin);
+}
+
+function clientIp(req) {
+  return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
+}
+
+function ratePolicy(req) {
+  const pathName = req.path || '';
+  const method = req.method || 'GET';
+
+  if (
+    method === 'GET' &&
+    (pathName.startsWith('/assets/') ||
+      pathName.startsWith('/brands/') ||
+      pathName.startsWith('/favicon') ||
+      pathName.endsWith('.css') ||
+      pathName.endsWith('.js') ||
+      pathName.endsWith('.png') ||
+      pathName.endsWith('.jpg') ||
+      pathName.endsWith('.jpeg') ||
+      pathName.endsWith('.svg') ||
+      pathName.endsWith('.ico') ||
+      pathName.endsWith('.webmanifest') ||
+      pathName.endsWith('.csv') ||
+      pathName.endsWith('.xml') ||
+      pathName === '/robots.txt' ||
+      pathName === '/.well-known/security.txt')
+  ) {
+    return null;
+  }
+
+  if (method === 'GET' && /^\/api\/(products|categories|status)\b/.test(pathName)) {
+    return { group: 'catalog-read', max: 2400, windowMs: 60 * 1000 };
+  }
+
+  if (method === 'GET' && pathName.startsWith('/api/')) {
+    return { group: 'api-read', max: 900, windowMs: 60 * 1000 };
+  }
+
+  if (pathName.startsWith('/api/')) {
+    return { group: 'api-write', max: 120, windowMs: 60 * 1000 };
+  }
+
+  return { group: 'page', max: 600, windowMs: 60 * 1000 };
+}
+
+function applySecurityHeaders(req, res, next) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(self)');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  res.setHeader('X-DNS-Prefetch-Control', 'on');
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+  next();
+}
+
+function securityRateLimit(req, res, next) {
+  const policy = ratePolicy(req);
+  if (!policy) {
+    return next();
+  }
+
+  const now = Date.now();
+  const key = `${clientIp(req)}:${policy.group}`;
+  const bucket = rateBuckets.get(key) || { count: 0, resetAt: now + policy.windowMs };
+
+  if (bucket.resetAt <= now) {
+    bucket.count = 0;
+    bucket.resetAt = now + policy.windowMs;
+  }
+
+  bucket.count += 1;
+  rateBuckets.set(key, bucket);
+
+  // Aggressive cleanup to prevent memory leaks - every 1000 requests
+  if (rateBuckets.size > 1000) {
+    for (const [bucketKey, value] of rateBuckets) {
+      if (value.resetAt <= now) rateBuckets.delete(bucketKey);
+    }
+    // If still too many, clear oldest 50%
+    if (rateBuckets.size > 2000) {
+      const entries = Array.from(rateBuckets.entries());
+      entries.sort((a, b) => a[1].resetAt - b[1].resetAt);
+      const toDelete = entries.slice(0, Math.floor(entries.length / 2));
+      for (const [key] of toDelete) {
+        rateBuckets.delete(key);
+      }
+    }
+  }
+
+  res.setHeader('RateLimit-Limit', String(policy.max));
+  res.setHeader('RateLimit-Remaining', String(Math.max(0, policy.max - bucket.count)));
+  res.setHeader('RateLimit-Reset', String(Math.ceil(bucket.resetAt / 1000)));
+
+  if (bucket.count > policy.max) {
+    return res.status(429).json({ success: false, error: 'Too many requests. Please try again shortly.' });
+  }
+
+  next();
+}
+
+function rejectSuspiciousRequests(req, res, next) {
+  const origin = req.headers.origin;
+  if (origin && !isAllowedOrigin(origin)) {
+    return res.status(403).json({ success: false, error: 'Origin not allowed' });
+  }
+
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    const contentType = String(req.headers['content-type'] || '');
+    if (contentType && !/^application\/json\b|^application\/x-www-form-urlencoded\b|^multipart\/form-data\b/i.test(contentType)) {
+      return res.status(415).json({ success: false, error: 'Unsupported content type' });
+    }
+  }
+
+  const rawUrl = decodeURIComponent(req.originalUrl || req.url || '').toLowerCase();
+  if (/<script|javascript:|union\s+select|information_schema|\.\.\//i.test(rawUrl)) {
+    return res.status(400).json({ success: false, error: 'Bad request' });
+  }
+
+  next();
+}
+
+function sanitizeObject(value) {
+  if (Array.isArray(value)) return value.map(sanitizeObject);
+  if (!value || typeof value !== 'object') {
+    return typeof value === 'string'
+      ? value.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '').replace(/\u0000/g, '').trim()
+      : value;
+  }
+
+  const clean = {};
+  for (const [key, val] of Object.entries(value)) {
+    if (key.startsWith('$') || key.includes('.')) continue;
+    clean[key] = sanitizeObject(val);
+  }
+  return clean;
+}
+
+// ── MONGODB STATE ────────────────────────────────────────────────────────────
+let db = null;
+let productsCol = null;
+let categoriesCol = null;
+let blogPostsCol = null;
+let mongoReady = false;
+let mongoLastError = null;
+let mongoInitPromise = null;
+
+// Defends against stray quotes/whitespace/newlines that hosting panels sometimes
+// inject into pasted env var values (e.g. "value" instead of value, or a trailing \n).
+function sanitizeMongoUri(raw) {
+  if (!raw) return raw;
+  // Strip every whitespace/invisible-Unicode char wherever it appears — a valid
+  // connection string never legitimately contains any of these, but hosting
+  // panel textareas/copy-paste can silently inject them mid-string (e.g. a
+  // regular space or non-breaking space right before the "@").
+  let uri = raw.replace(/[\s\u200B\u200C\u200D\uFEFF\u00A0]+/g, '').trim();
+  // Un-escape stray backslashes before "%" (e.g. "\%40" -> "%40") \u2014 a hosting
+  // panel or shell-style copy/paste can inject these before percent-encoded
+  // password characters, which silently breaks auth without changing length
+  // in any whitespace-detectable way.
+  uri = uri.replace(/\\(%)/g, '$1');
+  if (uri.length >= 2) {
+    const first = uri[0];
+    const last = uri[uri.length - 1];
+    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+      uri = uri.slice(1, -1).trim();
+    }
+  }
+  return uri;
+}
+
+async function initMongo() {
+  if (!process.env.MONGODB_URI) {
+    console.warn('⚠️ MONGODB_URI not set. Running in WooCommerce-only mode.');
+    return;
+  }
+
+  let client;
+  try {
+    client = new MongoClient(sanitizeMongoUri(process.env.MONGODB_URI), {
+      maxPoolSize: 5, // Limit connections to save resources
+      minPoolSize: 1,
+      maxIdleTimeMS: 30000,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    });
+    await client.connect();
+    db = client.db(process.env.MONGODB_DB_NAME || 'Luxeholic');
+    productsCol = db.collection('products');
+    categoriesCol = db.collection('categories');
+    blogPostsCol = db.collection('blog_posts');
+    await ensureMongoIndexes();
+    mongoReady = true;
+    mongoLastError = null;
+    console.log('✅ MongoDB connected successfully');
+  } catch (err) {
+    mongoLastError = err.message;
+    console.error('❌ MongoDB connection failed:', err.message);
+    // A rejected connect() doesn't fully tear down the driver's background
+    // topology/SRV monitors — left open, they keep retrying TLS handshakes
+    // against Atlas indefinitely, burning threadpool/socket resources on a
+    // host with a low LVE thread cap. Close it so the failure is final.
+    if (client) await client.close().catch(() => {});
+    // Don't crash the server if MongoDB fails
+    mongoReady = false;
+  }
+}
+mongoInitPromise = initMongo();
+
+// Safe, password-free fingerprint of the URI actually loaded on this server —
+// lets us verify Hostinger's live env var without ever exposing the secret.
+function getMongoUriFingerprint() {
+  const raw = process.env.MONGODB_URI;
+  if (!raw) return { set: false };
+  const uri = sanitizeMongoUri(raw);
+  try {
+    const withoutScheme = uri.replace(/^mongodb(\+srv)?:\/\//, '');
+    const atIndex = withoutScheme.lastIndexOf('@');
+    const afterAt = atIndex >= 0 ? withoutScheme.slice(atIndex + 1) : withoutScheme;
+    const [hostAndDb, query = ''] = afterAt.split('?');
+    const userPart = atIndex >= 0 ? withoutScheme.slice(0, atIndex) : '';
+    const colonIndex = userPart.indexOf(':');
+    const username = colonIndex >= 0 ? userPart.slice(0, colonIndex) : userPart || null;
+    const password = colonIndex >= 0 ? userPart.slice(colonIndex + 1) : '';
+    const queryParamLengths = {};
+    for (const pair of query.split('&')) {
+      const eq = pair.indexOf('=');
+      if (eq < 0) continue;
+      queryParamLengths[pair.slice(0, eq)] = pair.slice(eq + 1).length;
+    }
+    return {
+      set: true,
+      rawLength: raw.length,
+      sanitizedLength: uri.length,
+      wasSanitized: raw !== uri,
+      username,
+      usernameLength: username ? username.length : 0,
+      passwordLength: password.length,
+      hostAndDb,
+      hasAuthSourceAdmin: /authSource=admin/i.test(query),
+      queryParamLengths,
+    };
+  } catch {
+    return { set: true, rawLength: raw.length, sanitizedLength: uri.length, parseError: true };
+  }
+}
+
+async function waitForMongoReady(maxMs = 9000) {
+  if (mongoReady) return true;
+  if (!mongoInitPromise) return false;
+
+  await Promise.race([
+    mongoInitPromise,
+    new Promise((resolve) => setTimeout(resolve, maxMs)),
+  ]);
+
+  return mongoReady;
+}
+
+async function createIndexIfPossible(collection, keys, options = {}) {
+  const { ignoreDuplicateKeyError = false, ...indexOptions } = options;
+  try {
+    await collection.createIndex(keys, indexOptions);
+  } catch (err) {
+    const codeName = err?.codeName || '';
+    const code = err?.code;
+    const message = err?.message || String(err);
+    if (
+      codeName === 'IndexOptionsConflict' ||
+      codeName === 'IndexKeySpecsConflict' ||
+      /equivalent index already exists|already exists with a different name/i.test(message)
+    ) {
+      console.warn(`⚠️ Reusing existing MongoDB index on ${collection.collectionName}: ${message}`);
+      return;
+    }
+
+    if (ignoreDuplicateKeyError && (code === 11000 || /duplicate key/i.test(message))) {
+      console.warn(`⚠️ Skipping MongoDB index on ${collection.collectionName}: existing duplicate values found. ${message}`);
+      return;
+    }
+
+    throw err;
+  }
+}
+
+async function ensureMongoIndexes() {
+  await Promise.all([
+    createIndexIfPossible(productsCol, { id: 1 }, { unique: true }),
+    createIndexIfPossible(productsCol, { slug: 1 }),
+    createIndexIfPossible(productsCol, { updatedAt: -1 }),
+    createIndexIfPossible(productsCol, { 'categories.slug': 1 }),
+    createIndexIfPossible(productsCol, { 'categories.name': 1 }),
+    createIndexIfPossible(productsCol, { name: 'text', description: 'text', searchText: 'text' }),
+    createIndexIfPossible(categoriesCol, { slug: 1 }, { unique: true }),
+    createIndexIfPossible(categoriesCol, { count: -1, name: 1 }),
+    createIndexIfPossible(
+      blogPostsCol,
+      { slug: 1 },
+      {
+        unique: true,
+        partialFilterExpression: { slug: { $type: 'string' } },
+        ignoreDuplicateKeyError: true,
+      }
+    ),
+    createIndexIfPossible(blogPostsCol, { tag: 1 }),
+    createIndexIfPossible(blogPostsCol, { createdAt: -1 }),
+  ]);
+}
+
+function slugifyBlogTitle(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
+}
+
+async function uniqueBlogSlug(baseSlug, excludeId) {
+  let candidate = baseSlug || 'post';
+  let suffix = 1;
+  while (true) {
+    const existing = await blogPostsCol.findOne({ slug: candidate });
+    if (!existing || (excludeId && existing._id.toString() === excludeId)) {
+      return candidate;
+    }
+    suffix += 1;
+    candidate = `${baseSlug}-${suffix}`;
+  }
+}
+
+async function deriveCategoriesFromProducts(page = 1, perPage = 100) {
+  if (!productsCol) return { categories: [], total: 0 };
+
+  const pipeline = [
+    { $unwind: '$categories' },
+    {
+      $group: {
+        _id: '$categories.slug',
+        id: { $first: '$categories.id' },
+        name: { $first: '$categories.name' },
+        slug: { $first: '$categories.slug' },
+        count: { $sum: 1 },
+        sampleImage: { $first: { $arrayElemAt: ['$images.src', 0] } },
+      },
+    },
+    { $match: { slug: { $nin: [null, '', 'uncategorized'] }, count: { $gt: 0 } } },
+    { $sort: { count: -1, name: 1 } },
+    {
+      $facet: {
+        data: [
+          { $skip: Math.max(0, (page - 1) * perPage) },
+          { $limit: perPage },
+        ],
+        meta: [{ $count: 'total' }],
+      },
+    },
+  ];
+
+  const [result] = await productsCol.aggregate(pipeline, { allowDiskUse: true }).toArray();
+  return {
+    categories: result?.data || [],
+    total: Number(result?.meta?.[0]?.total || 0),
+  };
+}
+
+function mask(str) {
+  if (!str) return '❌ MISSING';
+  return str.substring(0, 3) + '...' + str.substring(str.length - 2);
+}
+
+// ── DYNAMIC STORE CONFIG ─────────────────────────────────────────────────────
+const DEFAULT_WOO_URLS = {
+  IN: 'https://store.luxeholic.in',
+  AU: 'https://au.luxeholic.in',
+  NZ: 'https://nz.luxeholic.in',
+};
+
+let wooCategoryCache = { expiresAt: 0, bySlug: new Map(), ordered: [] };
+
+function cleanWooBaseUrl(value) {
+  return String(value || '')
+    .replace(/\/wp-json\/wc\/v3\/?$/i, '')
+    .replace(/\/+$/, '');
+}
+
+function requestRegion(req) {
+  // AU/NZ have no backend of their own and call this server cross-origin, so they
+  // can't rely on the Host header (unspoofable from browser fetch) — they instead
+  // pass ?region=AU/NZ explicitly.
+  const queryRegion = String(req.query?.region || '').toUpperCase();
+  if (queryRegion === 'AU' || queryRegion === 'NZ') return queryRegion;
+
+  const host = String(req.headers.host || '').toLowerCase();
+  if (host.includes('com.au')) return 'AU';
+  if (host.includes('co.nz')) return 'NZ';
+  return 'IN';
+}
+
+function envWooUrl(region) {
+  if (region === 'AU') return cleanWooBaseUrl(process.env.VITE_WOOCOMMERCE_URL_AUSTRALIA);
+  if (region === 'NZ') return cleanWooBaseUrl(process.env.VITE_WOOCOMMERCE_URL_NEWZEALAND);
+  return cleanWooBaseUrl(process.env.VITE_WOOCOMMERCE_URL_INDIA || process.env.VITE_WOOCOMMERCE_URL);
+}
+
+function envWooCredentials(region) {
+  if (region === 'AU') {
+    return {
+      key: process.env.VITE_WOOCOMMERCE_KEY_AUSTRALIA,
+      secret: process.env.VITE_WOOCOMMERCE_SECRET_AUSTRALIA,
+    };
+  }
+  if (region === 'NZ') {
+    return {
+      key: process.env.VITE_WOOCOMMERCE_KEY_NEWZEALAND,
+      secret: process.env.VITE_WOOCOMMERCE_SECRET_NEWZEALAND,
+    };
+  }
+  return {
+    key: process.env.VITE_WOOCOMMERCE_KEY_INDIA || process.env.VITE_WOOCOMMERCE_KEY,
+    secret: process.env.VITE_WOOCOMMERCE_SECRET_INDIA || process.env.VITE_WOOCOMMERCE_SECRET,
+  };
+}
+
+function getWooStoreCandidates(req) {
+  const region = requestRegion(req);
+  const candidates = [];
+  const addCandidate = (candidateRegion, label) => {
+    const credentials = envWooCredentials(candidateRegion);
+    const url = envWooUrl(candidateRegion) || DEFAULT_WOO_URLS[candidateRegion];
+    if (!url || !credentials.key || !credentials.secret) return;
+    const key = `${url}:${credentials.key}`;
+    if (candidates.some((candidate) => candidate.cacheKey === key)) return;
+    candidates.push({ region: candidateRegion, label, url, ...credentials, cacheKey: key });
+  };
+
+  addCandidate(region, 'regional');
+  if (region !== 'IN') addCandidate('IN', 'india-fallback');
+  if (candidates.length === 0) addCandidate('IN', 'default');
+  return candidates;
+}
+
+function getWooUrl(req) {
+  return getWooStoreCandidates(req)[0]?.url || DEFAULT_WOO_URLS.IN;
+}
+
+function getWooCredentials(req) {
+  const candidate = getWooStoreCandidates(req)[0];
+  return { key: candidate?.key, secret: candidate?.secret };
+}
+
+// The Basic-Auth `Authorization` header (WooCommerce's other supported auth
+// method) gets a flat 400 at Hostinger's edge for this account regardless of
+// credential validity — so every WooCommerce call must authenticate via
+// consumer_key/consumer_secret query params instead (also supported by the
+// WooCommerce REST API over HTTPS, for all HTTP methods).
+function withWooCreds(url, key, secret) {
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}consumer_key=${encodeURIComponent(key)}&consumer_secret=${encodeURIComponent(secret)}`;
+}
+
+function withWooCredsForReq(url, req) {
+  const { key, secret } = getWooCredentials(req);
+  if (!key || !secret) throw new Error('WooCommerce credentials are not configured');
+  return withWooCreds(url, key, secret);
+}
+
+// The MongoDB product cache doesn't store variations (sync only embeds them
+// when SYNC_VARIATIONS=true), so a variable product served straight from
+// Mongo would otherwise reach the frontend with no color/size options at
+// all. Fetch them from WooCommerce on demand for that case.
+async function attachWooVariations(product, req) {
+  if (!product || product.type !== 'variable') return product;
+  if (Array.isArray(product.variations) && product.variations.length > 0) return product;
+  try {
+    const candidate = getWooStoreCandidates(req)[0];
+    if (!candidate) return product;
+    const variationsUrl = withWooCreds(`${candidate.url}/wp-json/wc/v3/products/${product.id}/variations?per_page=100`, candidate.key, candidate.secret);
+    const vr = await fetch(variationsUrl, { headers: { Accept: 'application/json' } });
+    if (!vr.ok) return product;
+    const variations = await vr.json();
+    return { ...product, variations: Array.isArray(variations) ? variations : [] };
+  } catch (err) {
+    console.warn('Failed to attach WooCommerce variations to Mongo product:', err.message);
+    return product;
+  }
+}
+
+async function fetchWooWithFallback(req, endpoint, init = {}) {
+  let lastResponse = null;
+  let lastError = null;
+  for (const candidate of getWooStoreCandidates(req)) {
+    const url = withWooCreds(`${candidate.url}/wp-json/wc/v3/${endpoint.replace(/^\/+/, '')}`, candidate.key, candidate.secret);
+    try {
+      const response = await fetch(url, {
+        ...init,
+        headers: {
+          ...(init.headers || {}),
+          Accept: 'application/json',
+        },
+      });
+      if (response.ok) return { response, candidate };
+      lastResponse = response;
+      if (![401, 403, 404].includes(response.status)) return { response, candidate };
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  if (lastResponse) return { response: lastResponse, candidate: null };
+  throw lastError || new Error('WooCommerce request failed');
+}
+
+async function fetchWooCategoryMap(req) {
+  const cacheRegion = requestRegion(req);
+  if (wooCategoryCache.region === cacheRegion && wooCategoryCache.expiresAt > Date.now() && wooCategoryCache.bySlug.size > 0) {
+    return wooCategoryCache;
+  }
+
+  let lastError = null;
+  for (const candidate of getWooStoreCandidates(req)) {
+    const url = withWooCreds(`${candidate.url}/wp-json/wc/v3/products/categories?per_page=100&hide_empty=true&orderby=count&order=desc`, candidate.key, candidate.secret);
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      lastError = new Error(`WooCommerce categories ${response.status} (${candidate.label})`);
+      if ([401, 403, 404].includes(response.status)) continue;
+      throw lastError;
+    }
+
+    const categories = (await response.json()).filter((category) => Number(category.count || 0) > 0);
+    if (categories.length === 0 && candidate.label === 'regional' && getWooStoreCandidates(req).length > 1) {
+      lastError = new Error(`WooCommerce categories empty (${candidate.label})`);
+      continue;
+    }
+
+    const bySlug = new Map();
+    for (const category of categories) {
+      bySlug.set(String(category.slug || '').toLowerCase(), category);
+    }
+
+    wooCategoryCache = {
+      region: cacheRegion,
+      activeStore: candidate,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+      bySlug,
+      ordered: categories,
+    };
+
+    return wooCategoryCache;
+  }
+
+  throw lastError || new Error('WooCommerce categories unavailable');
+}
+
+function electronicsCategoryOrder(categories) {
+  const priority = [
+    'mobile-accessories',
+    'smart-wear',
+    'wearables',
+    'security',
+    'outdoor-sports',
+    'home-garden',
+  ];
+  const bySlug = new Map(categories.map((category) => [category.slug, category]));
+  const ordered = priority.map((slug) => bySlug.get(slug)).filter(Boolean);
+  for (const category of categories) {
+    if (!priority.includes(category.slug) && category.slug !== 'uncategorized') {
+      ordered.push(category);
+    }
+  }
+  return ordered;
+}
+
+function wooFallbackEnabled() {
+  return process.env.ENABLE_WOO_FALLBACK === 'true';
+}
+
+function escapeRegex(value = '') {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function decodeHtmlEntities(value = '') {
+  return String(value)
+    .replace(/&amp;/gi, '&')
+    .replace(/&#038;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#039;/gi, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .trim();
+}
+
+function categorySearchVariants(value = '') {
+  const decoded = decodeHtmlEntities(value);
+  const raw = String(value || '').trim();
+  const dashed = decoded.replace(/\s*&\s*/g, '-').replace(/\s+/g, '-').toLowerCase();
+  const spaced = decoded.replace(/\s*&\s*/g, ' and ').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  return [...new Set([
+    raw,
+    decoded,
+    spaced,
+    dashed,
+    raw.replace(/&/g, '&amp;'),
+    decoded.replace(/&/g, '&amp;'),
+    spaced.replace(/\band\b/gi, '&'),
+  ].filter(Boolean))];
+}
+
+function productIdFromSlug(slug = '') {
+  const match = String(slug).match(/-(\d+)$/);
+  return match ? match[1] : null;
+}
+
+const PUBLIC_HOSTS = ['luxeholic.in', 'luxeholic.com.au', 'luxeholic.co.nz'];
+const HREFLANG_BY_HOST = {
+  'luxeholic.in': 'en-in',
+  'luxeholic.com.au': 'en-au',
+  'luxeholic.co.nz': 'en-nz',
+};
+const STATIC_PUBLIC_PATHS = [
+  { path: '/', changefreq: 'daily', priority: '1.0' },
+  { path: '/shop', changefreq: 'daily', priority: '0.95' },
+  { path: '/latest-arrivals', changefreq: 'daily', priority: '0.9' },
+  { path: '/categories', changefreq: 'weekly', priority: '0.85' },
+  { path: '/blog', changefreq: 'weekly', priority: '0.75' },
+  { path: '/about', changefreq: 'monthly', priority: '0.55' },
+  { path: '/contact', changefreq: 'monthly', priority: '0.55' },
+  { path: '/faq', changefreq: 'monthly', priority: '0.5' },
+  { path: '/shipping-returns', changefreq: 'monthly', priority: '0.45' },
+  { path: '/payment-method', changefreq: 'monthly', priority: '0.45' },
+  { path: '/return-exchange', changefreq: 'monthly', priority: '0.55' },
+  { path: '/return-policy', changefreq: 'monthly', priority: '0.55' },
+  { path: '/privacy', changefreq: 'yearly', priority: '0.3' },
+  { path: '/terms', changefreq: 'yearly', priority: '0.3' },
+];
+const BLOG_SLUGS = [
+  'gan-wall-charger-fast-compact-powerful',
+  'top-10-laptops-for-creators-2025',
+  'how-to-choose-your-next-mirrorless-camera',
+  'anc-vs-passive-what-actually-works',
+];
+const sitemapCache = new Map();
+const SITEMAP_CACHE_MS = 6 * 60 * 60 * 1000;
+const PRODUCT_LIST_PROJECTION = {
+  id: 1,
+  type: 1,
+  slug: 1,
+  name: 1,
+  shortDescription: 1,
+  categories: 1,
+  price: 1,
+  salePrice: 1,
+  regularPrice: 1,
+  images: { $slice: 2 },
+  rating: 1,
+  reviewCount: 1,
+  stockStatus: 1,
+  sku: 1,
+  seo: 1,
+  updatedAt: 1,
+  syncedAt: 1,
+};
+
+function getPublicHost(req) {
+  const host = String(req.headers.host || '').split(':')[0].replace(/^www\./, '');
+  return PUBLIC_HOSTS.includes(host) ? host : 'luxeholic.in';
+}
+
+function absoluteForHost(host, pathname = '/') {
+  const cleanPath = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  return `https://${host}${cleanPath}`;
+}
+
+function xmlEscape(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function validIsoDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+}
+
+function alternateLinks(pathname) {
+  return [
+    ...PUBLIC_HOSTS.map((host) =>
+      `    <xhtml:link rel="alternate" hreflang="${HREFLANG_BY_HOST[host]}" href="${xmlEscape(absoluteForHost(host, pathname))}"/>`
+    ),
+    `    <xhtml:link rel="alternate" hreflang="x-default" href="${xmlEscape(absoluteForHost('luxeholic.in', pathname))}"/>`,
+  ].join('\n');
+}
+
+function sitemapUrlEntry(host, pathname, { changefreq = 'weekly', priority = '0.5', lastmod = null, alternates = true } = {}) {
+  return [
+    '  <url>',
+    `    <loc>${xmlEscape(absoluteForHost(host, pathname))}</loc>`,
+    alternates ? alternateLinks(pathname) : '',
+    lastmod ? `    <lastmod>${xmlEscape(lastmod)}</lastmod>` : '',
+    changefreq ? `    <changefreq>${changefreq}</changefreq>` : '',
+    priority ? `    <priority>${priority}</priority>` : '',
+    '  </url>',
+  ].filter(Boolean).join('\n');
+}
+
+function stripHtml(value = '') {
+  return String(value)
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, ' and ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function csvField(value = '') {
+  return `"${String(value ?? '').replace(/"/g, '""').replace(/\r?\n/g, ' ').trim()}"`;
+}
+
+function feedTitle(product) {
+  const title = stripHtml(product.name || '');
+  return title.length > 150 ? title.slice(0, 150).replace(/\s+\S*$/, '') : title;
+}
+
+function feedDescription(product) {
+  const text = stripHtml(product.seo?.description || product.shortDescription || product.short_description || product.description || `Shop ${product.name} online at Luxeholic.`);
+  return text.length > 5000 ? text.slice(0, 5000).replace(/\s+\S*$/, '') : text;
+}
+
+function feedCategory(product) {
+  return decodeHtmlEntities(product.categories?.[0]?.name || 'Electronics');
+}
+
+function feedGoogleCategory(product) {
+  const text = `${product.name || ''} ${feedCategory(product)} ${product.categories?.[0]?.slug || ''}`.toLowerCase();
+  if (/home|garden|water tank|storage|kitchen|bathroom|household|furniture|cleaning|organizer|drawer/.test(text)) return 'Home & Garden';
+  if (/outdoor|sport|sports|camping|bicycle|cycling|fishing|hiking/.test(text)) return 'Sporting Goods > Outdoor Recreation';
+  if (/security|surveillance|cctv|alarm|access control|doorbell/.test(text)) return 'Cameras & Optics > Cameras > Security Cameras';
+  if (/phone|mobile|smartphone|iphone|android/.test(text)) return 'Electronics > Communications > Telephony > Mobile Phones';
+  if (/case|cover|protector|charger|cable|adapter|power bank|holder|mount/.test(text)) return 'Electronics > Electronics Accessories';
+  if (/camera|lens|tripod/.test(text)) return 'Cameras & Optics > Cameras';
+  if (/headphone|earbud|earphone|speaker|audio|microphone/.test(text)) return 'Electronics > Audio';
+  if (/watch|wearable|fitness band/.test(text)) return 'Electronics > Wearable Technology > Smart Watches';
+  if (/laptop|notebook|keyboard|mouse|computer/.test(text)) return 'Electronics > Computers';
+  if (/game|controller|console/.test(text)) return 'Electronics > Video Game Consoles';
+  return 'Electronics > Consumer Electronics';
+}
+
+function feedPrice(product, currency = 'INR') {
+  const value = Number(product.price || product.regularPrice || product.regular_price || 0);
+  return `${value.toFixed(2)} ${currency}`;
+}
+
+function feedSalePrice(product, currency = 'INR') {
+  const regular = Number(product.regularPrice || product.regular_price || 0);
+  const current = Number(product.price || 0);
+  return regular && current && current < regular ? `${current.toFixed(2)} ${currency}` : '';
+}
+
+function feedImage(product) {
+  return product.images?.find((image) => image?.src)?.src || '';
+}
+
+function feedAttr(product, name) {
+  const found = product.attributes?.find((item) => item?.name?.toLowerCase() === name.toLowerCase());
+  return found?.options?.[0] || found?.value || '';
+}
+
+async function activeWooStore(req) {
+  const categoryMap = await fetchWooCategoryMap(req);
+  return categoryMap.activeStore || getWooStoreCandidates(req)[0];
+}
+
+async function fetchWooCatalogProducts(req, { limit = 45000, fields = '' } = {}) {
+  const store = await activeWooStore(req);
+  if (!store) return [];
+
+  const products = [];
+
+  for (let page = 1; page <= 500; page++) {
+    const params = new URLSearchParams({
+      per_page: '100',
+      page: String(page),
+      status: 'publish',
+      orderby: 'date',
+      order: 'desc',
+    });
+    if (fields) params.set('_fields', fields);
+
+    const url = withWooCreds(`${store.url}/wp-json/wc/v3/products?${params}`, store.key, store.secret);
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.warn(`WooCommerce catalog fetch failed: ${response.status} page ${page}`);
+      break;
+    }
+
+    const batch = await response.json();
+    if (!Array.isArray(batch) || batch.length === 0) break;
+
+    products.push(...batch);
+    if (batch.length < 100 || products.length >= limit) break;
+  }
+
+  return products.slice(0, limit);
+}
+
+async function fetchFeedProducts(req) {
+  if (mongoReady && productsCol) {
+    try {
+      const products = await productsCol
+        .find({ slug: { $exists: true, $ne: '' }, price: { $gt: 0 } })
+        .project({
+          id: 1, name: 1, slug: 1, description: 1, shortDescription: 1, short_description: 1,
+          price: 1, regularPrice: 1, regular_price: 1, stockStatus: 1, stock_status: 1,
+          sku: 1, images: 1, categories: 1, attributes: 1, weight: 1, seo: 1,
+        })
+        .limit(50000)
+        .toArray();
+      if (products.length > 0) return products;
+    } catch (err) {
+      console.warn('Feed MongoDB product fetch failed:', err.message);
+    }
+  }
+
+  return fetchWooCatalogProducts(req, { limit: 50000 });
+}
+
+async function fetchSitemapProducts(req) {
+  if (mongoReady && productsCol) {
+    try {
+      const products = await productsCol
+        .find({ slug: { $exists: true, $ne: '' } })
+        .project({ slug: 1, date_modified: 1, modified: 1, updatedAt: 1 })
+        .limit(45000)
+        .toArray();
+      if (products.length > 0) {
+        return products.map((product) => ({
+          slug: product.slug,
+          lastmod: validIsoDate(product.date_modified || product.modified || product.updatedAt),
+        }));
+      }
+    } catch (err) {
+      console.warn('Sitemap MongoDB product fetch failed:', err.message);
+    }
+  }
+
+  try {
+    const products = (await fetchWooCatalogProducts(req, {
+      limit: 45000,
+      fields: 'id,slug,date_modified_gmt,date_modified,modified',
+    })).map((product) => ({
+      slug: product.slug,
+      lastmod: validIsoDate(product.date_modified_gmt || product.date_modified || product.modified),
+    }));
+    return products.filter((product) => product.slug);
+  } catch (err) {
+    console.warn('Sitemap WooCommerce product fetch failed:', err.message);
+    return [];
+  }
+}
+
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.use(applySecurityHeaders);
+app.use(securityRateLimit);
+app.use(rejectSuspiciousRequests);
+app.use(cors({
+  origin(origin, callback) {
+    if (isAllowedOrigin(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Sync-Token'],
+}));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
+app.use((req, _res, next) => {
+  if (req.body) req.body = sanitizeObject(req.body);
+  next();
+});
+
+// ── Blog media uploads (local disk, served statically) ───────────────────────
+const UPLOADS_DIR = path.join(__dirname, 'uploads', 'blog');
+mkdirSync(UPLOADS_DIR, { recursive: true });
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { maxAge: '7d' }));
+
+const blogMediaUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+    filename: (_req, file, cb) => {
+      const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_').slice(-80);
+      cb(null, `${Date.now()}-${safeName}`);
+    },
+  }),
+  limits: { fileSize: 80 * 1024 * 1024 }, // 80MB, generous enough for short background videos
+  fileFilter: (_req, file, cb) => {
+    if (/^image\/|^video\//.test(file.mimetype)) return cb(null, true);
+    cb(new Error('Only image or video files are allowed'));
+  },
+});
+
+const pdfUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'application/pdf') return cb(null, true);
+    cb(new Error('Only PDF files are allowed'));
+  },
+});
+
+const htmlUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (/^text\/html$/.test(file.mimetype) || /\.html?$/i.test(file.originalname)) return cb(null, true);
+    cb(new Error('Only HTML files are allowed'));
+  },
+});
+
+function extractPdfParagraphs(rawText) {
+  return rawText
+    .replace(/\f/g, '\n\n')
+    .split(/\n\s*\n/)
+    .map((block) => block.replace(/\s*\n\s*/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+}
+
+function extractHtmlTitle(html) {
+  const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+  if (titleMatch?.[1]?.trim()) return decodeHtmlEntities(titleMatch[1]).trim();
+  const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  if (h1Match?.[1]) return decodeHtmlEntities(h1Match[1].replace(/<[^>]+>/g, '')).trim();
+  return '';
+}
+
+function extractHtmlBody(html) {
+  const withoutNonContent = html
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '');
+  const bodyMatch = withoutNonContent.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  const raw = bodyMatch ? bodyMatch[1] : withoutNonContent;
+  return sanitizeBlogHtml(raw.trim());
+}
+
+function extractHtmlParagraphs(html) {
+  const withoutNonContent = html
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '');
+  const withParagraphBreaks = withoutNonContent
+    .replace(/<\/(p|div|li|h[1-6]|blockquote|tr)>/gi, '\n\n')
+    .replace(/<br\s*\/?>/gi, '\n\n');
+  const stripped = withParagraphBreaks.replace(/<[^>]+>/g, '');
+  return decodeHtmlEntities(stripped)
+    .split(/\n\s*\n/)
+    .map((block) => block.replace(/\s*\n\s*/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+}
+
+app.post('/api/blogs/upload', (req, res) => {
+  blogMediaUpload.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ success: false, error: err.message || 'Upload failed' });
+    if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+    const url = `/uploads/blog/${req.file.filename}`;
+    const kind = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
+    return res.status(201).json({ success: true, data: { url, kind } });
+  });
+});
+
+app.post('/api/blogs/parse-pdf', (req, res) => {
+  pdfUpload.single('file')(req, res, async (err) => {
+    if (err) return res.status(400).json({ success: false, error: err.message || 'Upload failed' });
+    if (!req.file) return res.status(400).json({ success: false, error: 'No PDF uploaded' });
+    try {
+      const parser = new PDFParse({ data: req.file.buffer });
+      const result = await parser.getText();
+      await parser.destroy();
+      const paragraphs = extractPdfParagraphs(result.text || '');
+      if (paragraphs.length === 0) {
+        return res.status(422).json({ success: false, error: 'No extractable text found in this PDF' });
+      }
+      return res.json({
+        success: true,
+        data: {
+          suggestedTitle: paragraphs[0]?.slice(0, 120) || '',
+          suggestedExcerpt: (paragraphs[1] || paragraphs[0] || '').slice(0, 220),
+          content: paragraphs,
+        },
+      });
+    } catch (parseErr) {
+      return res.status(500).json({ success: false, error: 'Unable to parse PDF', details: parseErr.message });
+    }
+  });
+});
+
+app.post('/api/blogs/parse-html', (req, res) => {
+  htmlUpload.single('file')(req, res, async (err) => {
+    if (err) return res.status(400).json({ success: false, error: err.message || 'Upload failed' });
+    if (!req.file) return res.status(400).json({ success: false, error: 'No HTML file uploaded' });
+    try {
+      const html = req.file.buffer.toString('utf8');
+      const paragraphs = extractHtmlParagraphs(html);
+      const bodyHtml = extractHtmlBody(html);
+      if (paragraphs.length === 0 && !bodyHtml) {
+        return res.status(422).json({ success: false, error: 'No extractable content found in this HTML file' });
+      }
+      const suggestedTitle = extractHtmlTitle(html) || paragraphs[0]?.slice(0, 120) || '';
+      return res.json({
+        success: true,
+        data: {
+          suggestedTitle,
+          suggestedExcerpt: (paragraphs[1] || paragraphs[0] || '').slice(0, 220),
+          content: paragraphs,
+          bodyHtml,
+        },
+      });
+    } catch (parseErr) {
+      return res.status(500).json({ success: false, error: 'Unable to parse HTML', details: parseErr.message });
+    }
+  });
+});
+
+// ── DEBUG ─────────────────────────────────────────────────────────────────────
+app.get('/debug', (req, res) => {
+  if (!process.env.DEBUG_TOKEN || req.query.token !== process.env.DEBUG_TOKEN) {
+    return res.status(404).json({ success: false, error: 'Not found' });
+  }
+
+  let assets = [];
+  try { assets = readdirSync(path.join(BUILD_DIR, 'assets')); } catch (e) { }
+
+  res.json({
+    ok: true,
+    build: BUILD_DIR,
+    buildExists: existsSync(path.join(BUILD_DIR, 'index.html')),
+    mongo: {
+      ready: mongoReady,
+      hasUri: !!process.env.MONGODB_URI,
+      dbName: process.env.MONGODB_DB_NAME || 'Luxeholic',
+      lastError: mongoLastError,
+      fallbackEnabled: wooFallbackEnabled(),
+    },
+    env_check: {
+      FIREBASE_KEY: mask(process.env.VITE_FIREBASE_API_KEY),
+      MONGODB_DB_NAME: process.env.MONGODB_DB_NAME || 'Luxeholic',
+      WOO_URL: process.env.VITE_WOOCOMMERCE_URL_INDIA || process.env.VITE_WOOCOMMERCE_URL,
+      WOO_KEY: mask(process.env.VITE_WOOCOMMERCE_KEY_INDIA || process.env.VITE_WOOCOMMERCE_KEY),
+      WOO_SEC: mask(process.env.VITE_WOOCOMMERCE_SECRET_INDIA || process.env.VITE_WOOCOMMERCE_SECRET),
+    },
+    assets: assets.filter(a => !a.startsWith('.')),
+  });
+});
+
+async function sendPinterestFeed(req, res) {
+  const staticFeedPath = path.join(BUILD_DIR, 'pinterest-feed.csv');
+  if (existsSync(staticFeedPath)) {
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.type('text/csv').sendFile(staticFeedPath);
+  }
+
+  const host = getPublicHost(req);
+  const products = (await fetchFeedProducts(req)).filter((product) => feedImage(product));
+  const header = [
+    'id', 'title', 'description', 'link', 'image_link', 'additional_image_link',
+    'price', 'sale_price', 'availability', 'brand', 'condition', 'product_type',
+    'google_product_category', 'gtin', 'mpn', 'item_group_id', 'color', 'size',
+    'age_group', 'gender', 'material', 'pattern', 'shipping_weight',
+  ];
+  const rows = products.map((product) => [
+    product.id,
+    feedTitle(product),
+    feedDescription(product),
+    absoluteForHost(host, `/product/${encodeURIComponent(product.slug)}`),
+    feedImage(product),
+    product.images?.slice(1, 4).map((image) => image?.src).filter(Boolean).join(',') || '',
+    feedPrice(product),
+    feedSalePrice(product),
+    (product.stockStatus || product.stock_status) === 'outofstock' ? 'out of stock' : 'in stock',
+    'Luxeholic',
+    'new',
+    feedCategory(product),
+    feedGoogleCategory(product),
+    '',
+    product.sku || product.id,
+    product.id,
+    feedAttr(product, 'Color'),
+    feedAttr(product, 'Size'),
+    'adult',
+    'unisex',
+    feedAttr(product, 'Material'),
+    '',
+    product.weight || '',
+  ].map(csvField).join(','));
+
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.type('text/csv').send([header.join(','), ...rows].join('\n'));
+}
+
+app.get(['/feeds/pinterest.csv', '/pinterest-feed.csv'], sendPinterestFeed);
+
+async function sendGoogleMerchantFeed(req, res) {
+  const staticFeedPath = path.join(BUILD_DIR, 'google-merchant-feed.csv');
+  if (existsSync(staticFeedPath)) {
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.type('text/csv').sendFile(staticFeedPath);
+  }
+
+  const host = getPublicHost(req);
+  const products = (await fetchFeedProducts(req)).filter((product) => feedImage(product));
+  const header = [
+    'id', 'title', 'description', 'link', 'image_link', 'additional_image_link',
+    'availability', 'price', 'sale_price', 'condition', 'brand',
+    'google_product_category', 'product_type', 'mpn', 'identifier_exists',
+  ];
+  const rows = products.map((product) => [
+    product.id,
+    feedTitle(product),
+    feedDescription(product),
+    absoluteForHost(host, `/product/${encodeURIComponent(product.slug)}`),
+    feedImage(product),
+    product.images?.slice(1, 10).map((image) => image?.src).filter(Boolean).join(',') || '',
+    (product.stockStatus || product.stock_status) === 'outofstock' ? 'out of stock' : 'in stock',
+    feedPrice(product),
+    feedSalePrice(product),
+    'new',
+    'Luxeholic',
+    feedGoogleCategory(product),
+    feedCategory(product),
+    product.sku || product.id,
+    product.sku ? 'yes' : 'no',
+  ].map(csvField).join(','));
+
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.type('text/csv').send([header.join(','), ...rows].join('\n'));
+}
+
+app.get(['/feeds/google-merchant.csv', '/google-merchant-feed.csv'], sendGoogleMerchantFeed);
+
+// ── WOOCOMMERCE API ───────────────────────────────────────────────────────────
+// ── WOOCOMMERCE API ───────────────────────────────────────────────────────────
+app.get('/api/products', async (req, res) => {
+  const page = parseInt(req.query.page || '1', 10);
+  const perPage = Math.min(Math.max(parseInt(req.query.per_page || '50', 10), 1), 500);
+  const search = req.query.search;
+  const category = req.query.category;
+  await waitForMongoReady();
+
+  // The Mongo cache is a single region-agnostic collection (India pricing/currency
+  // only) — AU/NZ must always go through the region-aware WooCommerce fallback
+  // below so they get correct AUD/NZD pricing instead of India's cached INR data.
+  const region = requestRegion(req);
+
+  // Public storefront reads from MongoDB. Woo fallback is opt-in only.
+  if (region === 'IN' && mongoReady && productsCol) {
+    try {
+      const filters = [];
+      let sort = { updatedAt: -1 };
+      if (search) {
+        const searchText = String(search).trim();
+        if (searchText.length >= 2) {
+          filters.push({ $text: { $search: searchText } });
+          sort = { score: { $meta: 'textScore' } };
+        } else {
+          const safeSearch = escapeRegex(searchText);
+          filters.push({ $or: [
+            { name: { $regex: safeSearch, $options: 'i' } },
+            { slug: { $regex: safeSearch, $options: 'i' } },
+            { searchText: { $regex: safeSearch, $options: 'i' } },
+            { description: { $regex: safeSearch, $options: 'i' } },
+            { 'categories.name': { $regex: safeSearch, $options: 'i' } },
+            { 'categories.slug': { $regex: safeSearch, $options: 'i' } },
+          ] });
+        }
+      }
+      if (category) {
+        const categoryVariants = categorySearchVariants(category);
+        const categoryRegexes = categoryVariants.map((variant) => {
+          const pattern = escapeRegex(variant)
+            .replace(/\\-/g, '[\\s-]')
+            .replace(/-/g, '[\\s-]')
+            .replace(/&/g, '(?:&|&amp;|and)');
+          return new RegExp(pattern, 'i');
+        });
+        filters.push({ $or: [
+          { 'categories.name': { $in: categoryRegexes } },
+          { 'categories.slug': { $in: categoryVariants } },
+          { category: { $in: categoryRegexes } },
+          { categorySlug: { $in: categoryVariants } },
+        ] });
+      }
+      const query = filters.length > 1 ? { $and: filters } : filters[0] || {};
+
+      const total = await productsCol.countDocuments(query);
+      const items = await productsCol.find(query)
+        .project(PRODUCT_LIST_PROJECTION)
+        .sort(sort)
+        .skip((page - 1) * perPage)
+        .limit(perPage)
+        .toArray();
+
+      res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
+      return res.json({
+        success: true,
+        data: items,
+        total,
+        pagination: { page, perPage, total, totalPages: Math.ceil(total / perPage) },
+        source: 'mongodb',
+      });
+    } catch (err) {
+      console.error('MongoDB query error:', err.message);
+      console.warn('Falling back to WooCommerce products because MongoDB query failed.');
+    }
+  }
+
+  // Storefront fallback: if Mongo is cold/unavailable, keep the shop online via WooCommerce.
+  try {
+    const params = new URLSearchParams(req.query);
+    const categoryMap = await fetchWooCategoryMap(req);
+    const activeStore = categoryMap.activeStore || getWooStoreCandidates(req)[0];
+    const wooUrl = activeStore.url;
+    params.set('status', 'publish');
+    params.set('per_page', String(Math.min(perPage, 100)));
+    params.set('page', String(page));
+
+    if (category) {
+      const resolvedCategory = categoryMap.bySlug.get(String(category).toLowerCase());
+      if (resolvedCategory?.id) {
+        params.set('category', String(resolvedCategory.id));
+      }
+    }
+
+    const url = `${wooUrl}/wp-json/wc/v3/products?${params}`;
+
+    if (!search && !category && page === 1) {
+      const priorityCategories = electronicsCategoryOrder(categoryMap.ordered);
+      const batches = [];
+      const seen = new Set();
+
+      for (const priorityCategory of priorityCategories) {
+        if (batches.length >= perPage) break;
+        const priorityParams = new URLSearchParams(params);
+        priorityParams.set('category', String(priorityCategory.id));
+        priorityParams.set('per_page', String(Math.min(24, perPage - batches.length)));
+        priorityParams.set('page', '1');
+        const priorityUrl = withWooCreds(`${wooUrl}/wp-json/wc/v3/products?${priorityParams}`, activeStore.key, activeStore.secret);
+        const priorityResponse = await fetch(priorityUrl);
+        if (!priorityResponse.ok) continue;
+        const priorityItems = await priorityResponse.json();
+        for (const item of Array.isArray(priorityItems) ? priorityItems : []) {
+          if (!seen.has(item.id)) {
+            seen.add(item.id);
+            batches.push(item);
+          }
+          if (batches.length >= perPage) break;
+        }
+      }
+
+      const total = categoryMap.ordered.reduce((sum, item) => sum + Number(item.count || 0), 0);
+      return res.json({
+        success: true,
+        data: batches,
+        total,
+        pagination: { page, perPage, total, totalPages: Math.ceil(total / perPage) || 1 },
+        source: 'woocommerce-priority',
+        mongoReady,
+        mongoLastError,
+      });
+    }
+
+    const authedUrl = withWooCreds(url, activeStore.key, activeStore.secret);
+    console.log(`Proxying to Woo: ${url}`);
+    const r = await fetch(authedUrl);
+    if (!r.ok) {
+      const text = await r.text();
+      return res.status(r.status).json({ success: false, error: 'WooCommerce API error', details: text.slice(0, 500) });
+    }
+
+    const items = await r.json();
+    const total = parseInt(r.headers.get('X-WP-Total') || String(Array.isArray(items) ? items.length : 0), 10);
+    const totalPages = parseInt(r.headers.get('X-WP-TotalPages') || String(Math.ceil(total / perPage) || 1), 10);
+
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.json({
+      success: true,
+      data: items,
+      total,
+      pagination: { page, perPage, total, totalPages },
+      source: 'woocommerce',
+      mongoReady,
+      mongoLastError,
+    });
+  } catch (err) {
+    res.status(503).json({ success: false, error: 'Unable to load products', details: err.message, mongoLastError });
+  }
+});
+
+app.get('/api/products/slug/:slug', async (req, res) => {
+  const { slug } = req.params;
+  await waitForMongoReady();
+
+  // Public storefront reads from MongoDB. Woo fallback is opt-in only.
+  if (mongoReady && productsCol) {
+    try {
+      const product = await productsCol.findOne({ slug });
+      if (product) return res.json({ success: true, data: await attachWooVariations(product, req), source: 'mongodb' });
+    } catch (err) {
+      console.error('MongoDB slug error:', err.message);
+      console.warn('Falling back to WooCommerce product lookup because MongoDB slug query failed.');
+    }
+  }
+
+  // Storefront fallback: if Mongo is cold/unavailable, keep product pages online via WooCommerce.
+  try {
+    const productId = productIdFromSlug(slug);
+    const endpoint = productId
+      ? `products/${encodeURIComponent(productId)}`
+      : `products?slug=${encodeURIComponent(slug)}`;
+    const { response: r, candidate } = await fetchWooWithFallback(req, endpoint);
+    if (!r.ok) return res.status(r.status).json({ success: false, error: 'WooCommerce API error' });
+    const body = await r.json();
+    const item = Array.isArray(body) ? body[0] : body;
+
+    if (!item) return res.status(404).json({ success: false, error: 'Product not found' });
+
+    // Fetch variations if it's a variable product
+    let variations = [];
+    if (item.type === 'variable') {
+      const variationsUrl = withWooCreds(`${candidate.url}/wp-json/wc/v3/products/${item.id}/variations?per_page=100`, candidate.key, candidate.secret);
+      const vr = await fetch(variationsUrl, { headers: { Accept: 'application/json' } });
+      if (vr.ok) variations = await vr.json();
+    }
+
+    // Transform for frontend (minimal transformation needed as frontend expects MongoDB format or raw)
+    // Actually, root server.js is simple, we just send it.
+    // Wait, the frontend expects the format from createProductDocument!
+    // I should probably import createProductDocument or just manually map.
+    // But wait, the MongoDB sync already uses createProductDocument.
+
+    res.json({ success: true, data: { ...item, variations }, source: 'woocommerce' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/products/:id', async (req, res) => {
+  const { id } = req.params;
+  await waitForMongoReady();
+
+  // Public storefront reads from MongoDB. Woo fallback is opt-in only.
+  if (mongoReady && productsCol) {
+    try {
+      const product = await productsCol.findOne({ id: parseInt(id) });
+      if (product) return res.json({ success: true, data: await attachWooVariations(product, req), source: 'mongodb' });
+    } catch (err) {
+      console.error('MongoDB ID error:', err.message);
+      console.warn('Falling back to WooCommerce product lookup because MongoDB ID query failed.');
+    }
+  }
+
+  // Storefront fallback: if Mongo is cold/unavailable, keep product pages online via WooCommerce.
+  try {
+    const { response: r, candidate } = await fetchWooWithFallback(req, `products/${encodeURIComponent(id)}`);
+    const item = await r.json();
+
+    if (!item || item.code === 'rest_no_route') return res.status(404).json({ success: false, error: 'Product not found' });
+
+    // Fetch variations if it's a variable product
+    let variations = [];
+    if (item.type === 'variable') {
+      const variationsUrl = withWooCreds(`${candidate.url}/wp-json/wc/v3/products/${item.id}/variations?per_page=100`, candidate.key, candidate.secret);
+      const vr = await fetch(variationsUrl, { headers: { Accept: 'application/json' } });
+      if (vr.ok) variations = await vr.json();
+    }
+
+    res.json({ success: true, data: { ...item, variations }, source: 'woocommerce' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── ADMIN WOOCOMMERCE PROXY ROUTES ───────────────────────────────────────────
+app.get('/api/woo/products', async (req, res) => {
+  try {
+    const wooUrl = getWooUrl(req);
+    const params = new URLSearchParams();
+    const allowed = ['per_page', 'page', 'category', 'search', 'orderby', 'order', 'after', 'status', 'slug'];
+    for (const key of allowed) {
+      if (req.query[key]) params.set(key, String(req.query[key]));
+    }
+    if (!params.has('status')) params.set('status', 'publish');
+
+    const url = withWooCredsForReq(`${wooUrl}/wp-json/wc/v3/products?${params}`, req);
+
+    const r = await fetch(url, { headers: { 'Content-Type': 'application/json' } });
+    const text = await r.text();
+    if (!r.ok) {
+      return res.status(r.status).json({ success: false, error: `WooCommerce API error: ${r.statusText}`, details: text.slice(0, 500) });
+    }
+
+    res.set('X-WP-Total', r.headers.get('X-WP-Total') || '0');
+    res.set('X-WP-TotalPages', r.headers.get('X-WP-TotalPages') || '0');
+    res.set('Cache-Control', 'no-store');
+    res.json(JSON.parse(text));
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/woo/products/:id/variations', async (req, res) => {
+  try {
+    const wooUrl = getWooUrl(req);
+    const params = new URLSearchParams();
+    const allowed = ['per_page', 'page', 'status'];
+    for (const key of allowed) {
+      if (req.query[key]) params.set(key, String(req.query[key]));
+    }
+    if (!params.has('per_page')) params.set('per_page', '100');
+
+    const url = withWooCredsForReq(`${wooUrl}/wp-json/wc/v3/products/${req.params.id}/variations?${params}`, req);
+    const r = await fetch(url, { headers: { 'Content-Type': 'application/json' } });
+    const text = await r.text();
+    if (!r.ok) {
+      return res.status(r.status).json({ success: false, error: `WooCommerce variations error: ${r.statusText}`, details: text.slice(0, 500) });
+    }
+    res.set('Cache-Control', 'no-store');
+    res.json(JSON.parse(text));
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/woo/products/:id', async (req, res) => {
+  try {
+    const wooUrl = getWooUrl(req);
+    const url = withWooCredsForReq(`${wooUrl}/wp-json/wc/v3/products/${req.params.id}`, req);
+
+    const r = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
+    });
+    const text = await r.text();
+
+    if (!r.ok) {
+      return res.status(r.status).json({ success: false, error: `Failed to update product: ${r.statusText}`, details: text.slice(0, 800) });
+    }
+
+    res.json({ success: true, data: JSON.parse(text) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/woo/categories', async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+    const perPage = Math.min(Math.max(parseInt(req.query.per_page || '100', 10), 1), 100);
+    const categoryMap = await fetchWooCategoryMap(req);
+    const data = categoryMap.ordered.slice((page - 1) * perPage, page * perPage);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/categories', async (req, res) => {
+  const page = parseInt(req.query.page || '1', 10);
+  const perPage = Math.min(Math.max(parseInt(req.query.per_page || '100', 10), 1), 100);
+  await waitForMongoReady();
+
+  if (mongoReady && categoriesCol) {
+    try {
+      const filter = { count: { $gt: 0 } };
+      const total = await categoriesCol.countDocuments(filter);
+      const categories = await categoriesCol
+        .find(filter)
+        .sort({ count: -1, name: 1 })
+        .skip((page - 1) * perPage)
+        .limit(perPage)
+        .toArray();
+
+      return res.json({
+        success: true,
+        data: categories,
+        pagination: { page, perPage, total, totalPages: Math.ceil(total / perPage) },
+        source: 'mongodb',
+      });
+    } catch (err) {
+      console.error('MongoDB categories error:', err.message);
+    }
+  }
+
+  if (mongoReady && productsCol) {
+    try {
+      const { categories, total } = await deriveCategoriesFromProducts(page, perPage);
+      if (categories.length > 0) {
+        return res.json({
+          success: true,
+          data: categories,
+          pagination: { page, perPage, total, totalPages: Math.ceil(total / perPage) },
+          source: 'mongodb-products',
+        });
+      }
+    } catch (err) {
+      console.error('MongoDB derived categories error:', err.message);
+      console.warn('Falling back to WooCommerce categories because MongoDB-derived categories failed.');
+    }
+  }
+
+  try {
+    const categoryMap = await fetchWooCategoryMap(req);
+    const allCategories = categoryMap.ordered.filter((category) => Number(category.count || 0) > 0);
+    const total = allCategories.length;
+    const data = allCategories.slice((page - 1) * perPage, page * perPage);
+    const totalPages = Math.ceil(total / perPage) || 1;
+    res.json({
+      success: true,
+      data,
+      pagination: { page, perPage, total, totalPages },
+      source: 'woocommerce',
+      mongoReady,
+      mongoLastError,
+    });
+  } catch (err) {
+    res.status(503).json({ success: false, error: 'Unable to load categories', details: err.message, mongoLastError });
+  }
+});
+
+// ── BLOG POSTS ────────────────────────────────────────────────────────────────
+app.get('/api/blogs', async (req, res) => {
+  await waitForMongoReady();
+  if (!mongoReady || !blogPostsCol) {
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError, mongoUriFingerprint: getMongoUriFingerprint() });
+  }
+  try {
+    const filter = req.query.tag ? { tag: req.query.tag } : {};
+    const posts = await blogPostsCol.find(filter).sort({ createdAt: -1 }).toArray();
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.json({ success: true, data: posts });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Unable to load blog posts', details: err.message });
+  }
+});
+
+app.get('/api/blogs/slug/:slug', async (req, res) => {
+  await waitForMongoReady();
+  if (!mongoReady || !blogPostsCol) {
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError, mongoUriFingerprint: getMongoUriFingerprint() });
+  }
+  try {
+    const post = await blogPostsCol.findOne({ slug: req.params.slug });
+    if (!post) return res.status(404).json({ success: false, error: 'Blog post not found' });
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json({ success: true, data: post });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Unable to load blog post', details: err.message });
+  }
+});
+
+app.post('/api/blogs', async (req, res) => {
+  await waitForMongoReady();
+  if (!mongoReady || !blogPostsCol) {
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError, mongoUriFingerprint: getMongoUriFingerprint() });
+  }
+  const body = req.body || {};
+  const content = Array.isArray(body.content) ? body.content.map((p) => String(p || '').trim()).filter(Boolean) : [];
+  const images = Array.isArray(body.images) ? body.images.map((src) => String(src || '').trim()).filter(Boolean) : [];
+  const bodyHtml = body.bodyHtml ? sanitizeBlogHtml(String(body.bodyHtml)) : '';
+  if (!body.title?.trim() || !body.excerpt?.trim() || !body.tag?.trim() || (content.length === 0 && !bodyHtml)) {
+    return res.status(400).json({ success: false, error: 'Title, excerpt, tag and content (or rich HTML) are required' });
+  }
+  try {
+    const baseSlug = slugifyBlogTitle(body.title) || 'post';
+    const slug = await uniqueBlogSlug(baseSlug);
+    const now = new Date();
+    const doc = {
+      slug,
+      title: body.title.trim(),
+      excerpt: body.excerpt.trim(),
+      tag: body.tag.trim(),
+      date: body.date || now.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+      image: body.image?.trim() || undefined,
+      video: body.video?.trim() || undefined,
+      images,
+      bodyHtml: bodyHtml || undefined,
+      background: body.background?.trim() || undefined,
+      foreground: body.foreground?.trim() || undefined,
+      content,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const result = await blogPostsCol.insertOne(doc);
+    res.status(201).json({ success: true, data: { ...doc, _id: result.insertedId } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Unable to create blog post', details: err.message });
+  }
+});
+
+app.put('/api/blogs/:id', async (req, res) => {
+  await waitForMongoReady();
+  if (!mongoReady || !blogPostsCol) {
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError, mongoUriFingerprint: getMongoUriFingerprint() });
+  }
+  const { id } = req.params;
+  if (!ObjectId.isValid(id)) return res.status(404).json({ success: false, error: 'Blog post not found' });
+  try {
+    const existing = await blogPostsCol.findOne({ _id: new ObjectId(id) });
+    if (!existing) return res.status(404).json({ success: false, error: 'Blog post not found' });
+
+    const body = req.body || {};
+    const update = { updatedAt: new Date() };
+    if (body.title !== undefined) {
+      update.title = body.title.trim();
+      const baseSlug = slugifyBlogTitle(body.title) || 'post';
+      if (baseSlug !== slugifyBlogTitle(existing.title)) {
+        update.slug = await uniqueBlogSlug(baseSlug, id);
+      }
+    }
+    if (body.excerpt !== undefined) update.excerpt = body.excerpt.trim();
+    if (body.tag !== undefined) update.tag = body.tag.trim();
+    if (body.date !== undefined) update.date = body.date;
+    if (body.image !== undefined) update.image = body.image.trim() || undefined;
+    if (body.video !== undefined) update.video = body.video.trim() || undefined;
+    if (body.images !== undefined) {
+      update.images = Array.isArray(body.images) ? body.images.map((src) => String(src || '').trim()).filter(Boolean) : [];
+    }
+    if (body.background !== undefined) update.background = body.background.trim() || undefined;
+    if (body.foreground !== undefined) update.foreground = body.foreground.trim() || undefined;
+    if (body.content !== undefined) {
+      update.content = Array.isArray(body.content) ? body.content.map((p) => String(p || '').trim()).filter(Boolean) : [];
+    }
+    if (body.bodyHtml !== undefined) {
+      update.bodyHtml = body.bodyHtml ? sanitizeBlogHtml(String(body.bodyHtml)) : undefined;
+    }
+
+    await blogPostsCol.updateOne({ _id: new ObjectId(id) }, { $set: update });
+    const updated = await blogPostsCol.findOne({ _id: new ObjectId(id) });
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Unable to update blog post', details: err.message });
+  }
+});
+
+app.delete('/api/blogs/:id', async (req, res) => {
+  await waitForMongoReady();
+  if (!mongoReady || !blogPostsCol) {
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError, mongoUriFingerprint: getMongoUriFingerprint() });
+  }
+  const { id } = req.params;
+  if (!ObjectId.isValid(id)) return res.status(404).json({ success: false, error: 'Blog post not found' });
+  try {
+    const result = await blogPostsCol.deleteOne({ _id: new ObjectId(id) });
+    if (result.deletedCount === 0) return res.status(404).json({ success: false, error: 'Blog post not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Unable to delete blog post', details: err.message });
+  }
+});
+
+// ── WOOCOMMERCE TEST ──────────────────────────────────────────────────────────
+app.get('/api/test-woo', async (req, res) => {
+  const url = withWooCredsForReq(`${getWooUrl(req)}/wp-json/wc/v3/products?per_page=1`, req);
+
+  try {
+    const r = await fetch(url);
+    const text = await r.text();
+    res.json({ status: r.status, url, body: text.slice(0, 500) });
+  } catch (err) {
+    res.json({ error: err.message, url });
+  }
+});
+
+// ── SEO: DYNAMIC ROBOTS + SITEMAP FOR SEARCH CONSOLE ─────────────────────────
+app.get('/robots.txt', (req, res) => {
+  const host = getPublicHost(req);
+  res.type('text/plain; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send([
+    'User-agent: *',
+    'Allow: /',
+    '',
+    'Disallow: /admin',
+    'Disallow: /admin/',
+    'Disallow: /account',
+    'Disallow: /account/',
+    'Disallow: /cart',
+    'Disallow: /checkout',
+    'Disallow: /invoices',
+    '',
+    'Allow: /shop',
+    'Allow: /product/',
+    'Allow: /categories',
+    'Allow: /latest-arrivals',
+    'Allow: /blog',
+    '',
+    `Sitemap: ${absoluteForHost(host, '/sitemap.xml')}`,
+    '',
+  ].join('\n'));
+});
+
+app.get('/.well-known/security.txt', (_req, res) => {
+  res.type('text/plain; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.send([
+    'Contact: mailto:support@luxeholic.in',
+    'Preferred-Languages: en, hi',
+    'Canonical: https://luxeholic.in/.well-known/security.txt',
+    'Policy: https://luxeholic.in/privacy',
+    'Expires: 2027-06-15T00:00:00Z',
+    '',
+  ].join('\n'));
+});
+
+app.get('/sitemap.xml', async (req, res) => {
+  const host = getPublicHost(req);
+  const cached = sitemapCache.get(host);
+  if (cached && Date.now() - cached.createdAt < SITEMAP_CACHE_MS) {
+    res.type('application/xml; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.send(cached.xml);
+  }
+
+  const products = await fetchSitemapProducts(req);
+  const seen = new Set();
+  const entries = [];
+
+  for (const page of STATIC_PUBLIC_PATHS) {
+    entries.push(sitemapUrlEntry(host, page.path, page));
+    seen.add(page.path);
+  }
+
+  for (const slug of BLOG_SLUGS) {
+    const pathName = `/blog/${slug}`;
+    if (!seen.has(pathName)) {
+      entries.push(sitemapUrlEntry(host, pathName, { changefreq: 'monthly', priority: '0.6', alternates: true }));
+      seen.add(pathName);
+    }
+  }
+
+  for (const product of products) {
+    const slug = String(product.slug || '').trim();
+    if (!slug) continue;
+    const pathName = `/product/${encodeURIComponent(slug)}`;
+    if (seen.has(pathName)) continue;
+    entries.push(sitemapUrlEntry(host, pathName, {
+      changefreq: 'weekly',
+      priority: '0.8',
+      lastmod: product.lastmod,
+      alternates: true,
+    }));
+    seen.add(pathName);
+  }
+
+  const xml = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"',
+    '        xmlns:xhtml="http://www.w3.org/1999/xhtml">',
+    '',
+    ...entries,
+    '',
+    '</urlset>',
+  ].join('\n');
+
+  sitemapCache.set(host, { createdAt: Date.now(), xml });
+  res.type('application/xml; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send(xml);
+});
+
+// ── UNIVERSAL ASSET RESOLVER ──────────────────────────────────────────────────
+// Handles stale hashed filenames from LiteSpeed/browser cache
+const HASH_MAP = [
+  [/^index-.*\.js$/, 'index.js'],
+  [/^index-.*\.css$/, 'index.css'],
+  [/^vendor-react-.*\.js$/, 'vendor-react.js'],
+  [/^vendor-ui-.*\.js$/, 'vendor-ui.js'],
+  [/^vendor-query-.*\.js$/, 'vendor-query.js'],
+  [/^vendor-icons-.*\.js$/, 'vendor-icons.js'],
+  [/^vendor-firebase-.*\.js$/, 'vendor-firebase.js'],
+];
+
+app.get('/assets/:filename', (req, res, next) => {
+  const filename = req.params.filename.split('?')[0];
+
+  // Exact file exists → pass to static middleware
+  if (existsSync(path.join(BUILD_DIR, 'assets', filename))) return next();
+
+  // Remap hashed → fixed filename
+  for (const [pattern, fixed] of HASH_MAP) {
+    if (pattern.test(filename)) {
+      const fixedPath = path.join(BUILD_DIR, 'assets', fixed);
+      if (existsSync(fixedPath)) {
+        console.log(`🎯 Remapped: ${filename} → ${fixed}`);
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+        return res.sendFile(fixedPath);
+      }
+    }
+  }
+
+  // Asset truly missing → 404, never serve index.html for assets
+  console.warn(`❌ Asset not found: ${filename}`);
+  return res.status(404).end();
+});
+
+// ── STATIC FILES ──────────────────────────────────────────────────────────────
+if (existsSync(path.join(BUILD_DIR, 'index.html'))) {
+
+  app.use('/assets', express.static(path.join(BUILD_DIR, 'assets'), {
+    maxAge: 0,
+    etag: false,
+    lastModified: false,
+    setHeaders: (res) => {
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    },
+  }));
+
+  app.use(express.static(BUILD_DIR, { index: false }));
+
+  // ── STATIC POLICY PAGES (crawlable without JS) ─────────────────────────────
+  // This is a pure CSR app, so crawlers that don't execute JavaScript (e.g.
+  // catalog/ads policy reviewers) otherwise see a blank, generic shell on
+  // every route. Inject real markup for the return-policy route so the raw
+  // HTTP response itself is readable. Real visitors still get the full SPA —
+  // React replaces this content the moment it mounts.
+  const RETURN_POLICY_HTML = `
+    <main style="max-width:760px;margin:0 auto;padding:48px 24px;font-family:system-ui,sans-serif;line-height:1.6;color:#171717">
+      <h1>Return Policy</h1>
+      <p>We want every Luxeholic order to arrive correctly and safely. If something is wrong, our team will help you with a clear return, exchange or refund process. Your statutory consumer rights under applicable law remain fully preserved.</p>
+      <h2>Return Window</h2>
+      <p>India customers can request most returns within 3-7 days of delivery. Australia and New Zealand customers can request voluntary returns within 3-5 days of delivery. Some premium products may have product-specific windows shown on the product page.</p>
+      <ul>
+        <li>India: 3-7 days from confirmed delivery for most products.</li>
+        <li>Australia: 3-5 days from confirmed delivery. Australian Consumer Law rights remain unaffected.</li>
+        <li>New Zealand: 3-5 days from confirmed delivery. Consumer Guarantees Act rights remain unaffected.</li>
+      </ul>
+      <h2>Valid Return Conditions</h2>
+      <p>Items must be unused, unactivated, unworn and in original condition. Original packaging, manuals, accessories, warranty cards, invoices, serial number labels and manufacturer seals must be intact. A Return Merchandise Authorisation number is required before sending any item back.</p>
+      <h2>Non-Returnable Items</h2>
+      <p>Opened software, activated digital licences, used consumables, damaged products caused by misuse, tampered serial labels, clearance products and products marked final sale are not eligible for voluntary returns unless defective under applicable consumer law.</p>
+      <h2>How to Initiate a Return</h2>
+      <ol>
+        <li>Email support@luxeholic.in with subject: Return Request - Order #[Your Order Number].</li>
+        <li>Include your order number, item name, reason and photos or video for defective, damaged or wrong products.</li>
+        <li>Wait for approval and RMA instructions before shipping anything back.</li>
+        <li>Pack the item securely in its original packaging and include the invoice.</li>
+      </ol>
+      <h2>Refund Timelines</h2>
+      <p>Approved refunds are initiated within 2-3 business days after inspection. India payment refunds usually take 5-7 business days, bank transfers may take 7-10 business days, and international card refunds may take 7-14 business days depending on the issuing bank.</p>
+      <h2>Return Shipping Fees</h2>
+      <p>For change-of-mind returns, the customer is responsible for return shipping and original shipping charges are non-refundable. For dead-on-arrival, defective, wrong-item or transit-damaged cases approved by Luxeholic, we cover return pickup or provide return shipping instructions at no extra cost.</p>
+      <h2>Contact for Returns</h2>
+      <p>Email <a href="mailto:support@luxeholic.in">support@luxeholic.in</a> with your order number before shipping any item back. Phone support is available at +91 92664 33722, Monday to Saturday, 10:00 AM to 6:00 PM IST.</p>
+    </main>
+  `;
+
+  app.get(['/return-policy', '/return-exchange'], (req, res) => {
+    try {
+      let html = readFileSync(path.join(BUILD_DIR, 'index.html'), 'utf8');
+      html = html
+        .replace(/<title>.*?<\/title>/s, '<title>Return Policy | Luxeholic</title>')
+        .replace(/<meta name="description" content="[^"]*"\s*\/>/, '<meta name="description" content="Luxeholic return, exchange and refund policy for India, Australia and New Zealand customers." />')
+        .replace('<div id="root"></div>', `<div id="root">${RETURN_POLICY_HTML}</div>`);
+
+      const fbConfig = {
+        apiKey: process.env.VITE_FIREBASE_API_KEY,
+        authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.VITE_FIREBASE_APP_ID,
+      };
+      const configScript = `<script>window.__FIREBASE_CONFIG = ${JSON.stringify(fbConfig)};</script>`;
+      html = html.replace('<head>', `<head>\n  ${configScript}`);
+
+      res.set({
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Surrogate-Control': 'no-store',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
+      res.send(html);
+    } catch (e) {
+      console.error('Failed to serve static return-policy page:', e);
+      res.status(500).send('Internal error reading index.html');
+    }
+  });
+
+  // ── KNOWN APP ROUTES vs. LEGACY WORDPRESS JUNK ─────────────────────────────
+  // This domain previously ran a live WordPress + WooCommerce store. Google
+  // still has thousands of those old URLs queued (wp-admin, product filter
+  // AJAX query strings, etc). The SPA fallback used to return 200 for all of
+  // them, which both wastes crawl budget and makes Google treat them as
+  // duplicates of the homepage — actively hurting indexing of real pages.
+  const KNOWN_EXACT_ROUTES = new Set([
+    '/', '/shop', '/latest-arrivals', '/categories', '/cart', '/blog', '/contact', '/about', '/faq',
+    '/shipping-returns', '/payment-method', '/return-exchange', '/return-policy', '/returns', '/refund-policy',
+    '/privacy', '/terms', '/account', '/account/login', '/account/register', '/account/orders', '/account/profile',
+    '/admin', '/admin/products', '/admin/invoices', '/admin/blogs', '/invoices',
+  ]);
+  const KNOWN_ROUTE_PREFIXES = ['/product/', '/blog/'];
+  const LEGACY_WP_PATH_PATTERN = /^\/(wp-admin|wp-content|wp-json|wp-includes|wp-login\.php|xmlrpc\.php|feed|refund_returns|category|tag|author|page)\b/i;
+  const LEGACY_WP_QUERY_PATTERN = /post_type=product|filter_cat=|filter_color=|filter_brands=|shop_view=|product_cat=/i;
+
+  const isKnownAppRoute = (pathname) =>
+    KNOWN_EXACT_ROUTES.has(pathname) || KNOWN_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+
+  const isLegacyWordPressJunk = (pathname, rawQuery) =>
+    LEGACY_WP_PATH_PATTERN.test(pathname) || LEGACY_WP_QUERY_PATTERN.test(rawQuery || '');
+
+  // ── SPA FALLBACK ────────────────────────────────────────────────────────────
+  app.get(/(.*)/, (req, res) => {
+    if (
+      req.path.startsWith('/api') ||
+      req.path.startsWith('/assets') ||
+      req.path === '/debug'
+    ) return res.status(404).end();
+
+    // 410 Gone tells Google to stop recrawling permanently-removed legacy
+    // WordPress URLs (checked first since junk query params can land on an
+    // otherwise-known path like "/"); plain 404 covers genuine unmatched paths.
+    let statusCode = 200;
+    if (isLegacyWordPressJunk(req.path, req.url.split('?')[1])) {
+      statusCode = 410;
+    } else if (!isKnownAppRoute(req.path)) {
+      statusCode = 404;
+    }
+
+    try {
+      let html = readFileSync(path.join(BUILD_DIR, 'index.html'), 'utf8');
+
+      // Inject Firebase config from server env vars so window.__FIREBASE_CONFIG
+      // is available before index.js runs — fixes auth/invalid-api-key
+      const fbConfig = {
+        apiKey: process.env.VITE_FIREBASE_API_KEY,
+        authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.VITE_FIREBASE_APP_ID,
+      };
+
+      const configScript = `<script>window.__FIREBASE_CONFIG = ${JSON.stringify(fbConfig)};</script>`;
+      html = html.replace('<head>', `<head>\n  ${configScript}`);
+
+      // Surrogate-Control tells LiteSpeed/CDN never to cache this HTML
+      // so the injected window.__FIREBASE_CONFIG always reaches the browser
+      res.status(statusCode).set({
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Surrogate-Control': 'no-store',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
+
+      res.send(html);
+    } catch (e) {
+      console.error('Failed to serve index.html:', e);
+      res.status(500).send('Internal error reading index.html');
+    }
+  });
+
+} else {
+  app.get(/(.*)/, (req, res) =>
+    res.status(503).send(`Build not found at: ${BUILD_DIR} — check /debug`)
+  );
+}
+
+app.listen(port, () => {
+  console.log(`🚀 Server ready on port ${port}`);
+  console.log(`📁 Build dir:   ${BUILD_DIR}`);
+  console.log(`   Exists:      ${existsSync(path.join(BUILD_DIR, 'index.html'))}`);
+});

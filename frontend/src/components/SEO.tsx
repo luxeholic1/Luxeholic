@@ -1,0 +1,178 @@
+import { useEffect, useMemo } from "react";
+import { absoluteUrl, getSiteUrl, organizationSchema, websiteSchema } from "@/lib/seo";
+
+interface SEOProps {
+  title?: string;
+  description?: string;
+  keywords?: string;
+  image?: string;
+  url?: string;
+  type?: "website" | "article" | "product";
+  publishedTime?: string;
+  modifiedTime?: string;
+  author?: string;
+  canonical?: string;
+  noindex?: boolean;
+  nofollow?: boolean;
+  structuredData?: Record<string, any> | Record<string, any>[];
+}
+
+const SEO = ({
+  title = "Luxeholic — Premium Electronics & Gadgets Store",
+  description = "Shop premium electronics: smartphones, audio, wearables, laptops, gaming and cameras. Curated catalog with product support information.",
+  keywords = "electronics, gadgets, smartphones, laptops, audio, wearables, gaming, cameras, premium tech",
+  image = "/logo.jpeg",
+  url,
+  type = "website",
+  publishedTime,
+  modifiedTime,
+  author = "Luxeholic",
+  canonical,
+  noindex = false,
+  nofollow = false,
+  structuredData,
+}: SEOProps) => {
+  const fullTitle = title.includes("Luxeholic") ? title : `${title} | Luxeholic`;
+  const currentPath = typeof window !== "undefined" ? window.location.pathname : "/";
+  const fullUrl = canonical || absoluteUrl(url || currentPath);
+  const fullImage = absoluteUrl(image);
+  const robots = `${noindex ? "noindex" : "index"}, ${nofollow ? "nofollow" : "follow"}, max-image-preview:large, max-snippet:-1, max-video-preview:-1`;
+
+  const dataToUse = useMemo(() => {
+    const pageSchema = {
+      "@context": "https://schema.org",
+      "@type": type === "article" ? "Article" : type === "product" ? "ItemPage" : "WebPage",
+      "@id": `${fullUrl}#webpage`,
+      name: fullTitle,
+      description,
+      url: fullUrl,
+      inLanguage: "en",
+      isPartOf: { "@id": `${getSiteUrl()}/#website` },
+    };
+
+    const pageData = structuredData
+      ? Array.isArray(structuredData)
+        ? structuredData
+        : [structuredData]
+      : [];
+
+    return [organizationSchema(), websiteSchema(description), pageSchema, ...pageData];
+  }, [description, fullTitle, fullUrl, structuredData, type]);
+
+  useEffect(() => {
+    // Update document title
+    document.title = fullTitle;
+
+    // Update meta tags
+    const updateMetaTag = (name: string, content: string) => {
+      let meta = document.querySelector(`meta[name="${name}"]`);
+      if (!meta) {
+        meta = document.createElement("meta");
+        meta.setAttribute("name", name);
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute("content", content);
+    };
+
+    const updatePropertyTag = (property: string, content: string) => {
+      let meta = document.querySelector(`meta[property="${property}"]`);
+      if (!meta) {
+        meta = document.createElement("meta");
+        meta.setAttribute("property", property);
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute("content", content);
+    };
+
+    // Update basic meta tags
+    updateMetaTag("description", description);
+    updateMetaTag("keywords", keywords);
+    updateMetaTag("author", author);
+    updateMetaTag("robots", robots);
+    updateMetaTag("googlebot", robots);
+    updateMetaTag("bingbot", robots);
+    updateMetaTag("theme-color", "#020617");
+
+    // Update Open Graph tags
+    updatePropertyTag("og:title", fullTitle);
+    updatePropertyTag("og:description", description);
+    updatePropertyTag("og:image", fullImage);
+    updatePropertyTag("og:url", fullUrl);
+    updatePropertyTag("og:type", type);
+    updatePropertyTag("og:site_name", "Luxeholic");
+    updatePropertyTag("og:locale", "en_US");
+    updatePropertyTag("og:image:width", "1200");
+    updatePropertyTag("og:image:height", "630");
+
+    // Update Twitter tags
+    updateMetaTag("twitter:card", "summary_large_image");
+    updateMetaTag("twitter:title", fullTitle);
+    updateMetaTag("twitter:description", description);
+    updateMetaTag("twitter:image", fullImage);
+    updateMetaTag("twitter:site", "@luxeholic");
+    updateMetaTag("twitter:creator", "@luxeholic");
+
+    if (publishedTime) updatePropertyTag("article:published_time", publishedTime);
+    if (modifiedTime) updatePropertyTag("article:modified_time", modifiedTime);
+    if (author) updatePropertyTag("article:author", author);
+
+    // Update canonical link
+    let canonicalLink = document.querySelector('link[rel="canonical"]');
+    if (!canonicalLink) {
+      canonicalLink = document.createElement("link");
+      canonicalLink.setAttribute("rel", "canonical");
+      document.head.appendChild(canonicalLink);
+    }
+    canonicalLink.setAttribute("href", fullUrl);
+
+    const alternates = [
+      { hreflang: "en-in", href: "https://luxeholic.in" },
+      { hreflang: "en-au", href: "https://luxeholic.com.au" },
+      { hreflang: "en-nz", href: "https://luxeholic.co.nz" },
+      { hreflang: "x-default", href: "https://luxeholic.in" },
+    ];
+
+    document.querySelectorAll('link[data-lux-hreflang="true"]').forEach((link) => link.remove());
+    alternates.forEach((alternate) => {
+      const link = document.createElement("link");
+      link.setAttribute("rel", "alternate");
+      link.setAttribute("hreflang", alternate.hreflang);
+      link.setAttribute("href", `${alternate.href}${window.location.pathname}`);
+      link.setAttribute("data-lux-hreflang", "true");
+      document.head.appendChild(link);
+    });
+
+    document.querySelectorAll('script[data-lux-seo="true"]').forEach((script) => script.remove());
+    dataToUse.forEach((data, index) => {
+      const structuredDataScript = document.createElement("script");
+      structuredDataScript.setAttribute("type", "application/ld+json");
+      structuredDataScript.setAttribute("data-lux-seo", "true");
+      structuredDataScript.setAttribute("data-lux-seo-index", String(index));
+      structuredDataScript.textContent = JSON.stringify(data);
+      document.head.appendChild(structuredDataScript);
+    });
+
+    // Cleanup function
+    return () => {
+      // We don't remove the meta tags on cleanup to avoid flickering
+      // They will be overwritten by the next SEO component
+    };
+  }, [
+    fullTitle,
+    description,
+    keywords,
+    author,
+    robots,
+    fullImage,
+    fullUrl,
+    type,
+    dataToUse,
+    publishedTime,
+    modifiedTime,
+  ]);
+
+  // This component doesn't render anything visible
+  return null;
+};
+
+export default SEO;

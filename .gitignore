@@ -1,0 +1,47 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+# dist - tracked for Hostinger deployment
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.vercel
+
+# CI/CD — keep local overrides and production secrets out of git
+# .env contains real API keys — do not commit
+.env
+.env.local
+.env.production
+.env.india
+.env.australia
+.env.newzealand
+deploy.log
+
+# user-uploaded blog media (runtime, not source — lives on the server's local disk)
+uploads/
+
+# Generated feed exports (regenerate via `npm run pinterest:export` etc.) —
+# not served from here; the server reads feeds from build/, generating them
+# dynamically on request if no static copy is present. Committing these
+# bloated the repo (and every deployed copy) with unused dead weight.
+/assets/
+/google-merchant-feed.csv
+/pinterest-feed.csv
+/pinterest-pins*.csv
