@@ -26,23 +26,23 @@ const ShippingReturns = () => {
         </section>
 
         <section>
-          <h3 className="mb-4 text-xl font-semibold text-neutral-950">Delivery Timelines</h3>
-          <div className="overflow-x-auto border-y border-neutral-200">
+          <h3 className="mb-5 font-serif text-2xl font-light text-noir">Delivery Timelines</h3>
+          <div className="overflow-x-auto border-y border-border">
             <table className="w-full min-w-[620px] text-left text-sm sm:text-base">
-              <tbody className="divide-y divide-neutral-200">
+              <tbody className="divide-y divide-border">
                 {!hideIndiaTimeline && (
                   <tr>
-                    <th className="w-56 py-4 pr-6 font-medium text-neutral-950">India</th>
-                    <td className="py-4">Standard: 3-7 business days. Express: 1-3 business days in select cities.</td>
+                    <th className="w-56 py-5 pr-6 align-top font-serif text-lg font-normal text-noir">India</th>
+                    <td className="py-5 align-top">Standard: 3-7 business days. Express: 1-3 business days in select cities.</td>
                   </tr>
                 )}
                 <tr>
-                  <th className="py-4 pr-6 font-medium text-neutral-950">Australia</th>
-                  <td className="py-4">International standard: 3-5 working days.</td>
+                  <th className="py-5 pr-6 align-top font-serif text-lg font-normal text-noir">Australia</th>
+                  <td className="py-5 align-top">International standard: 3-5 working days.</td>
                 </tr>
                 <tr>
-                  <th className="py-4 pr-6 font-medium text-neutral-950">New Zealand</th>
-                  <td className="py-4">International standard: 3-5 working days.</td>
+                  <th className="py-5 pr-6 align-top font-serif text-lg font-normal text-noir">New Zealand</th>
+                  <td className="py-5 align-top">International standard: 3-5 working days.</td>
                 </tr>
               </tbody>
             </table>
@@ -51,14 +51,14 @@ const ShippingReturns = () => {
         </section>
 
         <section>
-          <h3 className="mb-4 text-xl font-semibold text-neutral-950">Shipping Charges</h3>
+          <h3 className="mb-5 font-serif text-2xl font-light text-noir">Shipping Charges</h3>
           <p>
             India orders above Rs. 999 qualify for free shipping. Orders below Rs. 999 may carry a flat Rs. 99 shipping fee. Australia and New Zealand shipping charges are calculated at checkout based on weight, dimensions and delivery zone.
           </p>
         </section>
 
         <section>
-          <h3 className="mb-4 text-xl font-semibold text-neutral-950">Shipping Partners and Tracking</h3>
+          <h3 className="mb-5 font-serif text-2xl font-light text-noir">Shipping Partners and Tracking</h3>
           <p>
             We use partners such as Blue Dart, Delhivery, DTDC, India Post, DHL Express, Australia Post, FedEx, NZ Post and CourierPost depending on destination and package type.
           </p>
@@ -68,14 +68,14 @@ const ShippingReturns = () => {
         </section>
 
         <section>
-          <h3 className="mb-4 text-xl font-semibold text-neutral-950">Customs, Duties and Taxes</h3>
+          <h3 className="mb-5 font-serif text-2xl font-light text-noir">Customs, Duties and Taxes</h3>
           <p>
             India prices include applicable GST. For Australia and New Zealand, GST and customs duties may apply based on order value and local import rules. Any import charges assessed by customs authorities are the buyer's responsibility unless stated otherwise at checkout.
           </p>
         </section>
 
         <section>
-          <h3 className="mb-4 text-xl font-semibold text-neutral-950">Damaged or Lost Shipments</h3>
+          <h3 className="mb-5 font-serif text-2xl font-light text-noir">Damaged or Lost Shipments</h3>
           <p>
             If a package arrives damaged, photograph or record the package before and after opening, then contact us within 48 hours of delivery. If a shipment is confirmed lost by the courier, we will arrange a replacement or refund.
           </p>

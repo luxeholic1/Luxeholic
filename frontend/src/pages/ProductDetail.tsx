@@ -180,8 +180,8 @@ const ProductDetail = () => {
       <Layout>
         <div className="container pt-40 text-center">
           <div className="inline-flex items-center gap-3 text-muted-foreground animate-pulse">
-            <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-            <span className="font-display text-xl">Loading product…</span>
+            <div className="h-5 w-5 rounded-full border-2 border-gold border-t-transparent animate-spin" />
+            <span className="font-serif text-xl">Loading piece…</span>
           </div>
         </div>
       </Layout>
@@ -192,8 +192,9 @@ const ProductDetail = () => {
     return (
       <Layout>
         <div className="container pt-40 text-center">
-          <h1 className="font-display text-4xl mb-4">Product not found</h1>
-          <Link to="/shop" className="text-primary">← Back to shop</Link>
+          <p className="eyebrow mb-3">Not Found</p>
+          <h1 className="font-serif text-4xl font-light mb-4">Product not found</h1>
+          <Link to="/shop" className="text-gold hover:underline">← Back to shop</Link>
         </div>
       </Layout>
     );
@@ -264,7 +265,7 @@ const ProductDetail = () => {
         {/* Breadcrumb */}
         <Link
           to="/shop"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-gold transition-colors"
         >
           <ChevronLeft className="h-4 w-4" />
           Back to shop
@@ -274,16 +275,15 @@ const ProductDetail = () => {
           {/* ── LEFT: Image Gallery ── */}
           <div className="flex flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
             {/* Main image */}
-            <div className="relative aspect-square overflow-hidden rounded-2xl border border-border bg-gradient-card shadow-sm group">
+            <div className="relative aspect-square overflow-hidden border border-border bg-gradient-card group">
               <div className="absolute inset-0 bg-gradient-radial opacity-60" />
-              <div className="absolute inset-4 rounded-[1.25rem] border border-white/40 bg-background/20 dark:border-white/5" />
               <img
                 key={displayImage}
                 src={displayImage}
                 alt={product.name}
                 width={800}
                 height={800}
-                className="relative mx-auto h-full w-[82%] object-contain transition-all duration-500 group-hover:scale-105"
+                className="hover-zoom-img relative mx-auto h-full w-[82%] object-contain"
               />
 
               {/* Previous / Next arrows for multiple images */}
@@ -292,14 +292,14 @@ const ProductDetail = () => {
                   <button
                     onClick={() => setActiveImageIndex((i) => Math.max(0, i - 1))}
                     disabled={activeImageIndex === 0}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-background/70 backdrop-blur border border-border flex items-center justify-center hover:bg-background transition-all disabled:opacity-30"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 h-9 w-9 bg-background/70 backdrop-blur border border-border flex items-center justify-center hover:border-gold hover:text-gold transition-all disabled:opacity-30"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setActiveImageIndex((i) => Math.min(productImages.length - 1, i + 1))}
                     disabled={activeImageIndex === productImages.length - 1}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-background/70 backdrop-blur border border-border flex items-center justify-center hover:bg-background transition-all disabled:opacity-30"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 bg-background/70 backdrop-blur border border-border flex items-center justify-center hover:border-gold hover:text-gold transition-all disabled:opacity-30"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -307,10 +307,10 @@ const ProductDetail = () => {
               )}
 
               {/* Stock badge */}
-              <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-semibold ${
+              <div className={`absolute top-4 right-4 px-3 py-1 text-[10px] uppercase tracking-[0.2em] font-semibold ${
                 inStock
-                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                  : "bg-red-500/20 text-red-400 border border-red-500/30"
+                  ? "bg-ivory/90 text-noir border border-noir/20"
+                  : "bg-burgundy/90 text-ivory border border-burgundy"
               }`}>
                 {inStock ? "In Stock" : "Out of Stock"}
               </div>
@@ -323,10 +323,10 @@ const ProductDetail = () => {
                   <button
                     key={idx}
                     onClick={() => setActiveImageIndex(idx)}
-                    className={`flex-shrink-0 h-20 w-20 rounded-xl border-2 flex items-center justify-center bg-gradient-card overflow-hidden transition-all ${
+                    className={`flex-shrink-0 h-20 w-20 border flex items-center justify-center bg-gradient-card overflow-hidden transition-all ${
                       activeImageIndex === idx
-                        ? "border-primary shadow-glow scale-105"
-                        : "border-border hover:border-primary/50"
+                        ? "border-gold"
+                        : "border-border hover:border-gold/50"
                     }`}
                   >
                     <img src={img} alt={`${product.name} thumbnail ${idx + 1}`} className="h-14 w-14 object-contain" />
@@ -337,21 +337,21 @@ const ProductDetail = () => {
           </div>
 
           {/* ── RIGHT: Product Info ── */}
-          <div className="flex flex-col rounded-2xl border border-border bg-card/85 p-4 shadow-sm backdrop-blur sm:p-5">
+          <div className="flex flex-col border border-border bg-card/85 p-4 backdrop-blur sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <p className="mb-2 inline-flex rounded-full bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-primary">
+                <p className="eyebrow mb-2">
                   {product.category}
                 </p>
-                <h1 className="max-w-3xl font-display text-2xl font-black leading-tight tracking-tight text-foreground sm:text-3xl lg:text-[2.15rem]">
+                <h1 className="max-w-3xl font-serif text-3xl font-light leading-tight tracking-tight text-foreground sm:text-4xl lg:text-[2.75rem]">
                   {product.name}
                 </h1>
               </div>
 
-              <div className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+              <div className={`shrink-0 px-3 py-1 text-[10px] uppercase tracking-[0.2em] font-semibold ${
                 inStock
-                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                  : "bg-red-500/10 text-red-500 border border-red-500/20"
+                  ? "bg-gold/10 text-gold border border-gold/30"
+                  : "bg-burgundy/10 text-burgundy border border-burgundy/30"
               }`}>
                 {inStock ? "In Stock" : "Out of Stock"}
               </div>
@@ -366,7 +366,7 @@ const ProductDetail = () => {
                       key={i}
                       className={
                         i < Math.round(product.rating)
-                          ? "h-4 w-4 fill-primary text-primary"
+                          ? "h-4 w-4 fill-gold text-gold"
                           : "h-4 w-4 text-muted-foreground"
                       }
                     />
@@ -380,7 +380,7 @@ const ProductDetail = () => {
 
               {/* Price */}
               <div className="ml-auto flex flex-wrap items-baseline gap-2">
-                <span className="font-display text-3xl font-black text-gradient sm:text-4xl">
+                <span className="font-serif text-3xl font-light text-foreground sm:text-4xl">
                   {formatPrice(currentPrice)}
                 </span>
                 {currentOldPrice && currentOldPrice > currentPrice && (
@@ -388,7 +388,7 @@ const ProductDetail = () => {
                     <span className="text-sm text-muted-foreground line-through">
                       {formatPrice(currentOldPrice)}
                     </span>
-                    <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-500">
+                    <span className="border border-gold/30 bg-gold/10 px-2 py-0.5 text-xs font-semibold text-gold">
                       Sale price
                     </span>
                   </>
@@ -409,13 +409,13 @@ const ProductDetail = () => {
                   const isColor = /colou?r/i.test(attrName);
 
                   return (
-                    <div key={attrName} className="space-y-2.5 rounded-xl border border-border bg-background/55 p-3">
+                    <div key={attrName} className="space-y-2.5 border border-border bg-background/55 p-3">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-foreground uppercase tracking-wide">
                           {attrName}
                         </span>
                         {selected && (
-                          <span className="text-xs text-primary font-medium">{selected}</span>
+                          <span className="text-xs text-gold font-medium">{selected}</span>
                         )}
                       </div>
 
@@ -431,12 +431,12 @@ const ProductDetail = () => {
                               onClick={() => available && handleAttributeChange(attrName, option)}
                               disabled={!available}
                               className={`
-                                relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold
+                                relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
                                 border transition-all duration-200 select-none
                                 ${isSelected
-                                  ? "border-primary bg-primary/10 text-primary shadow-glow scale-105"
+                                  ? "border-noir bg-noir text-ivory"
                                   : available
-                                    ? "border-border text-foreground hover:border-primary/60 hover:bg-secondary/50 hover:scale-105"
+                                    ? "border-border text-foreground hover:border-gold"
                                     : "border-border/40 text-muted-foreground/40 cursor-not-allowed line-through"
                                 }
                               `}
@@ -446,7 +446,7 @@ const ProductDetail = () => {
                               )}
                               {option}
                               {!available && (
-                                <span className="absolute inset-0 rounded-full overflow-hidden">
+                                <span className="absolute inset-0 overflow-hidden">
                                   <span
                                     className="absolute top-1/2 left-0 right-0 h-px bg-border/60 -rotate-6"
                                     style={{ transform: "rotate(-6deg) translateY(-50%)" }}
@@ -463,7 +463,7 @@ const ProductDetail = () => {
 
                 {/* No match warning */}
                 {attributeNames.length > 0 && !selectedVariation && (
-                  <div className="flex items-center gap-2 text-amber-400 text-xs bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2.5">
+                  <div className="flex items-center gap-2 text-burgundy text-xs bg-burgundy/10 border border-burgundy/20 px-4 py-2.5">
                     <AlertCircle className="h-4 w-4 shrink-0" />
                     This combination is not available. Please choose a different option.
                   </div>
@@ -478,17 +478,17 @@ const ProductDetail = () => {
               <span className="text-xs font-bold text-foreground uppercase tracking-wide">
                 Qty
               </span>
-              <div className="flex items-center gap-3 border border-border rounded-full px-3 py-1.5 bg-secondary/20">
+              <div className="flex items-center gap-3 border border-border px-3 py-1.5 bg-secondary/20">
                 <button
                   onClick={() => setQty((q) => Math.max(1, q - 1))}
-                  className="h-7 w-7 rounded-full hover:bg-secondary flex items-center justify-center transition-colors font-bold text-lg"
+                  className="h-7 w-7 hover:bg-secondary flex items-center justify-center transition-colors font-bold text-lg"
                 >
                   −
                 </button>
                 <span className="text-sm font-bold w-6 text-center">{qty}</span>
                 <button
                   onClick={() => setQty((q) => q + 1)}
-                  className="h-7 w-7 rounded-full hover:bg-secondary flex items-center justify-center transition-colors font-bold text-lg"
+                  className="h-7 w-7 hover:bg-secondary flex items-center justify-center transition-colors font-bold text-lg"
                 >
                   +
                 </button>
@@ -511,7 +511,7 @@ const ProductDetail = () => {
                   );
                 }}
                 disabled={!inStock || (attributeNames.length > 0 && !selectedVariation)}
-                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-brand px-6 py-3.5 text-sm font-bold text-primary-foreground shadow-glow hover:shadow-glow-pink transition-all hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="flex-1 inline-flex items-center justify-center gap-2 border border-noir bg-noir px-6 py-3.5 text-xs font-bold uppercase tracking-[0.2em] text-ivory transition-all hover:bg-burgundy hover:border-burgundy disabled:opacity-50 disabled:cursor-not-allowed"
                 data-analytics-label={`Buy now ${product.name}`}
                 data-product-id={product.id}
                 data-product-name={product.name}
@@ -526,10 +526,10 @@ const ProductDetail = () => {
               <button
                 onClick={handleAddToCart}
                 disabled={!inStock || (attributeNames.length > 0 && !selectedVariation)}
-                className={`flex-1 inline-flex items-center justify-center gap-2 rounded-xl border px-6 py-3.5 text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`flex-1 inline-flex items-center justify-center gap-2 border px-6 py-3.5 text-xs font-bold uppercase tracking-[0.2em] transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   addedToCart
-                    ? "border-emerald-500 text-emerald-400 bg-emerald-500/10"
-                    : "border-border bg-transparent text-foreground hover:bg-secondary"
+                    ? "border-gold text-gold bg-gold/10"
+                    : "border-border bg-transparent text-foreground hover:border-gold hover:text-gold"
                 }`}
                 data-analytics-label={`Add ${product.name} to cart`}
                 data-product-id={product.id}
@@ -541,27 +541,27 @@ const ProductDetail = () => {
                 {addedToCart ? (
                   <>
                     <Check className="h-4 w-4" />
-                    Added to Cart!
+                    Added to Bag!
                   </>
                 ) : (
-                  "Add to Cart"
+                  "Add to Bag"
                 )}
               </button>
 
-              <button className="h-12 w-12 rounded-xl border border-border flex items-center justify-center hover:border-accent hover:text-accent transition-colors flex-shrink-0">
+              <button className="h-12 w-12 border border-border flex items-center justify-center hover:border-gold hover:text-gold transition-colors flex-shrink-0">
                 <Heart className="h-5 w-5" />
               </button>
             </div>
 
             {/* Description */}
             {product.description && (
-              <div className="mt-5 rounded-xl border border-border bg-background/55 p-4">
+              <div className="mt-5 border border-border bg-background/55 p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <h2 className="font-display text-lg font-bold text-foreground">Product info</h2>
+                  <h2 className="eyebrow">Product Info</h2>
                   <button
                     type="button"
                     onClick={() => setShowMoreInfo((value) => !value)}
-                    className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary/40 hover:text-primary"
+                    className="border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-gold hover:text-gold"
                   >
                     {showMoreInfo ? "Show less" : "More info"}
                   </button>
@@ -587,8 +587,8 @@ const ProductDetail = () => {
                 { icon: Shield, label: "Coverage varies" },
                 { icon: RotateCcw, label: "Return support" },
               ].map((f) => (
-                <div key={f.label} className="rounded-xl bg-background/55 px-2 py-3 text-center">
-                  <f.icon className="h-4 w-4 mx-auto mb-1.5 text-primary" />
+                <div key={f.label} className="bg-background/55 px-2 py-3 text-center">
+                  <f.icon className="h-4 w-4 mx-auto mb-1.5 text-gold" />
                   <p className="text-[11px] font-semibold text-muted-foreground">{f.label}</p>
                 </div>
               ))}
@@ -599,8 +599,9 @@ const ProductDetail = () => {
 
       {/* Related Products */}
       <section className="container pb-24">
-        <h2 className="font-display font-bold text-3xl mb-8">
-          You may also <span className="text-gradient">like</span>
+        <p className="eyebrow mb-3">You May Also Like</p>
+        <h2 className="font-serif font-light text-4xl mb-8">
+          Related Pieces
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {related.map((p) => (

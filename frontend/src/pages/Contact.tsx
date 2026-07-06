@@ -55,44 +55,45 @@ const Contact = () => {
         }}
       />
 
-      <section className="container pt-10 sm:pt-12 lg:pt-14 pb-12 sm:pb-16">
-        <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">Contact</p>
-        <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">
-          Let's <span className="text-gradient">talk</span>
+      <section className="container pt-14 sm:pt-16 lg:pt-20 pb-14 sm:pb-16">
+        <p className="eyebrow">Customer Care</p>
+        <h1 className="mt-4 font-serif text-5xl font-light tracking-tight sm:text-6xl text-balance">
+          Let's <span className="shimmer-text">talk</span>
         </h1>
-        <p className="mt-4 text-muted-foreground max-w-xl">
+        <div className="gold-line mt-6 h-px w-24" />
+        <p className="mt-6 text-muted-foreground max-w-xl leading-relaxed">
           Questions, feedback, or need help with an order? We're here for you — usually reply within 24 hours.
         </p>
       </section>
 
-      <section className="container pb-16 sm:pb-20 lg:pb-24 grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <section className="container pb-20 sm:pb-24 lg:pb-28 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
         {/* Contact info */}
         <div className="space-y-4 lg:col-span-1">
           <a
             href="mailto:support@luxeholic.in"
-            className="p-6 rounded-2xl bg-gradient-card border border-border flex items-start gap-4 hover:border-primary/40 transition-colors block"
+            className="p-6 bg-card border border-border flex items-start gap-4 hover:border-gold/50 transition-colors block"
           >
-            <div className="h-11 w-11 rounded-xl bg-gradient-brand flex items-center justify-center shadow-glow flex-shrink-0">
-              <Mail className="h-5 w-5 text-primary-foreground" />
+            <div className="h-11 w-11 bg-noir flex items-center justify-center flex-shrink-0">
+              <Mail className="h-5 w-5 text-ivory" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Email</p>
-              <p className="font-medium mt-1">support@luxeholic.in</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Email</p>
+              <p className="font-serif text-lg mt-1">support@luxeholic.in</p>
               <p className="text-xs text-muted-foreground mt-0.5">Response within 24 hours</p>
             </div>
           </a>
 
           <a
             href="tel:+919266433722"
-            className="p-6 rounded-2xl bg-gradient-card border border-border flex items-start gap-4 hover:border-primary/40 transition-colors block"
+            className="p-6 bg-card border border-border flex items-start gap-4 hover:border-gold/50 transition-colors block"
           >
-            <div className="h-11 w-11 rounded-xl bg-gradient-brand flex items-center justify-center shadow-glow flex-shrink-0">
-              <Phone className="h-5 w-5 text-primary-foreground" />
+            <div className="h-11 w-11 bg-noir flex items-center justify-center flex-shrink-0">
+              <Phone className="h-5 w-5 text-ivory" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Phone</p>
-              <p className="font-medium mt-1">+91 92664 33722</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Phone</p>
+              <p className="font-serif text-lg mt-1">+91 92664 33722</p>
               <p className="text-xs text-muted-foreground mt-0.5">Mon–Sat, 9 AM – 6 PM IST</p>
             </div>
           </a>
@@ -101,38 +102,38 @@ const Contact = () => {
             href="https://wa.me/919266433722?text=Hi%20Luxeholic%2C%20I%20need%20help%20with"
             target="_blank"
             rel="noopener noreferrer"
-            className="p-6 rounded-2xl bg-gradient-card border border-border flex items-start gap-4 hover:border-primary/40 transition-colors block"
+            className="p-6 bg-card border border-border flex items-start gap-4 hover:border-gold/50 transition-colors block"
           >
-            <div className="h-11 w-11 rounded-xl bg-[#25D366] flex items-center justify-center shadow-glow flex-shrink-0">
-              <MessageCircle className="h-5 w-5 text-white" />
+            <div className="h-11 w-11 bg-noir flex items-center justify-center flex-shrink-0">
+              <MessageCircle className="h-5 w-5 text-ivory" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">WhatsApp</p>
-              <p className="font-medium mt-1">+91 92664 33722</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">WhatsApp</p>
+              <p className="font-serif text-lg mt-1">+91 92664 33722</p>
               <p className="text-xs text-muted-foreground mt-0.5">Quick replies on WhatsApp</p>
             </div>
           </a>
 
-          <div className="p-6 rounded-2xl bg-gradient-card border border-border flex items-start gap-4">
-            <div className="h-11 w-11 rounded-xl bg-gradient-brand flex items-center justify-center shadow-glow flex-shrink-0">
-              <MapPin className="h-5 w-5 text-primary-foreground" />
+          <div className="p-6 bg-card border border-border flex items-start gap-4">
+            <div className="h-11 w-11 bg-noir flex items-center justify-center flex-shrink-0">
+              <MapPin className="h-5 w-5 text-ivory" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Office Address</p>
-              <p className="font-medium mt-1">Suite NP 004, Tower N</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Office Address</p>
+              <p className="font-serif text-lg mt-1">Suite NP 004, Tower N</p>
               <p className="text-sm text-muted-foreground">Amarpali Zodiac, Noida</p>
               <p className="text-sm text-muted-foreground">Uttar Pradesh 201307</p>
               <p className="text-sm text-muted-foreground">India</p>
             </div>
           </div>
 
-          <div className="p-6 rounded-2xl bg-gradient-card border border-border flex items-start gap-4">
-            <div className="h-11 w-11 rounded-xl bg-gradient-brand flex items-center justify-center shadow-glow flex-shrink-0">
-              <Clock className="h-5 w-5 text-primary-foreground" />
+          <div className="p-6 bg-card border border-border flex items-start gap-4">
+            <div className="h-11 w-11 bg-noir flex items-center justify-center flex-shrink-0">
+              <Clock className="h-5 w-5 text-ivory" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Business Hours</p>
-              <p className="font-medium mt-1">Mon – Sat</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Business Hours</p>
+              <p className="font-serif text-lg mt-1">Mon – Sat</p>
               <p className="text-sm text-muted-foreground">9:00 AM – 6:00 PM IST</p>
               <p className="text-xs text-muted-foreground mt-1">Closed on Sundays & public holidays</p>
             </div>
@@ -140,44 +141,47 @@ const Contact = () => {
         </div>
 
         {/* Contact form */}
-        <form onSubmit={onSubmit} className="lg:col-span-2 p-8 rounded-3xl bg-gradient-card border border-border space-y-5">
-          <h2 className="font-display font-bold text-2xl">Send us a message</h2>
+        <form onSubmit={onSubmit} className="lg:col-span-2 p-8 sm:p-10 bg-card border border-border space-y-6">
+          <div>
+            <h2 className="font-serif text-3xl font-light">Send us a message</h2>
+            <div className="gold-line mt-4 h-px w-16" />
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs uppercase tracking-wider text-muted-foreground">Name *</label>
+              <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Name *</label>
               <input
                 required
                 name="name"
                 placeholder="Your full name"
-                className="mt-2 w-full h-12 rounded-xl border border-border bg-background px-4 text-sm focus:outline-none focus:border-primary transition-colors"
+                className="mt-2 w-full h-12 border border-border bg-background px-4 text-sm focus:outline-none focus:border-gold transition-colors"
               />
             </div>
             <div>
-              <label className="text-xs uppercase tracking-wider text-muted-foreground">Email *</label>
+              <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Email *</label>
               <input
                 required
                 type="email"
                 name="email"
                 placeholder="your@email.com"
-                className="mt-2 w-full h-12 rounded-xl border border-border bg-background px-4 text-sm focus:outline-none focus:border-primary transition-colors"
+                className="mt-2 w-full h-12 border border-border bg-background px-4 text-sm focus:outline-none focus:border-gold transition-colors"
               />
             </div>
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-muted-foreground">Phone (optional)</label>
+            <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Phone (optional)</label>
             <input
               type="tel"
               name="phone"
               placeholder="+91 XXXXX XXXXX"
-              className="mt-2 w-full h-12 rounded-xl border border-border bg-background px-4 text-sm focus:outline-none focus:border-primary transition-colors"
+              className="mt-2 w-full h-12 border border-border bg-background px-4 text-sm focus:outline-none focus:border-gold transition-colors"
             />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-muted-foreground">Subject *</label>
+            <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Subject *</label>
             <select
               required
               name="subject"
-              className="mt-2 w-full h-12 rounded-xl border border-border bg-background px-4 text-sm focus:outline-none focus:border-primary transition-colors"
+              className="mt-2 w-full h-12 border border-border bg-background px-4 text-sm focus:outline-none focus:border-gold transition-colors"
             >
               <option value="">Select a topic</option>
               <option value="order">Order enquiry</option>
@@ -190,24 +194,24 @@ const Contact = () => {
             </select>
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-muted-foreground">Message *</label>
+            <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Message *</label>
             <textarea
               required
               name="message"
               rows={6}
               placeholder="Describe your query in detail..."
-              className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary resize-none transition-colors"
+              className="mt-2 w-full border border-border bg-background px-4 py-3 text-sm focus:outline-none focus:border-gold resize-none transition-colors"
             />
           </div>
           <button
             type="submit"
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-brand px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-glow hover:shadow-glow-pink transition-all hover:scale-105"
+            className="inline-flex items-center gap-2 bg-noir px-7 py-3.5 text-sm font-medium uppercase tracking-[0.15em] text-ivory transition-all hover:bg-gold hover:text-noir"
           >
             Send message <Send className="h-4 w-4" />
           </button>
           <p className="text-xs text-muted-foreground">
             By submitting this form, you agree to our{" "}
-            <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a>.
+            <a href="/privacy" className="text-gold hover:underline">Privacy Policy</a>.
           </p>
         </form>
       </section>

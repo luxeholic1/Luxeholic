@@ -18,9 +18,9 @@ interface SEOProps {
 }
 
 const SEO = ({
-  title = "Luxeholic — Premium Electronics & Gadgets Store",
-  description = "Shop premium electronics: smartphones, audio, wearables, laptops, gaming and cameras. Curated catalog with product support information.",
-  keywords = "electronics, gadgets, smartphones, laptops, audio, wearables, gaming, cameras, premium tech",
+  title = "Luxeholic — Luxury, Curated.",
+  description = "Discover timeless handbags, footwear, and designer-inspired collections at Luxeholic — a modern luxury house for the considered connoisseur.",
+  keywords = "luxury handbags, designer shoes, luxury belts, luxury clothing, premium fashion, luxury accessories",
   image = "/logo.jpeg",
   url,
   type = "website",
@@ -91,7 +91,7 @@ const SEO = ({
     updateMetaTag("robots", robots);
     updateMetaTag("googlebot", robots);
     updateMetaTag("bingbot", robots);
-    updateMetaTag("theme-color", "#020617");
+    updateMetaTag("theme-color", "#111111");
 
     // Update Open Graph tags
     updatePropertyTag("og:title", fullTitle);

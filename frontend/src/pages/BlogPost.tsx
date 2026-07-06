@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
-import { Calendar, ArrowLeft, ArrowRight, ChevronDown, Loader2, Tag } from "lucide-react";
+import { Calendar, ArrowLeft, ArrowRight, Loader2, Tag } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { motion, useScroll } from "framer-motion";
 import SEO from "@/components/SEO";
@@ -18,7 +18,7 @@ const toIsoDate = (date: string) => {
 const stripHtml = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
 // Groups paragraphs into editorial "chapters" of 1 so long posts read as
-// distinct full-bleed, image-first sections instead of one continuous wall of text.
+// distinct sections instead of one continuous wall of text.
 const chunkParagraphs = (paragraphs: string[], size = 1) => {
   const chunks: string[][] = [];
   for (let i = 0; i < paragraphs.length; i += size) {
@@ -27,12 +27,12 @@ const chunkParagraphs = (paragraphs: string[], size = 1) => {
   return chunks;
 };
 
-const ReadingProgressBar = ({ color }: { color: string }) => {
+const ReadingProgressBar = () => {
   const { scrollYProgress } = useScroll();
   return (
     <motion.div
-      className="fixed inset-x-0 top-0 z-[60] h-1 origin-left"
-      style={{ backgroundColor: color, scaleX: scrollYProgress }}
+      className="fixed inset-x-0 top-0 z-[60] h-[2px] origin-left bg-gold"
+      style={{ scaleX: scrollYProgress }}
     />
   );
 };
@@ -82,8 +82,8 @@ const BlogPost = () => {
   if (loading) {
     return (
       <Layout hideBreadcrumb>
-        <section className="container flex min-h-[60vh] items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <section className="flex min-h-[60vh] items-center justify-center bg-ivory">
+          <Loader2 className="h-6 w-6 animate-spin text-gold" />
         </section>
       </Layout>
     );
@@ -92,15 +92,16 @@ const BlogPost = () => {
   if (!post) {
     return (
       <Layout hideBreadcrumb>
-        <section className="container pt-10 pb-24 max-w-2xl text-center">
-          <h1 className="font-display font-bold text-4xl tracking-tight">Article not found</h1>
-          <p className="mt-4 text-muted-foreground">The blog you are looking for is unavailable.</p>
+        <section className="container max-w-2xl pt-16 pb-24 text-center">
+          <p className="eyebrow">The Journal</p>
+          <h1 className="mt-4 font-serif text-4xl tracking-tight">Story not found</h1>
+          <p className="mt-4 font-light text-noir/60">The story you are looking for is unavailable.</p>
           <Link
             to="/blog"
-            className="mt-8 inline-flex items-center gap-2 rounded-full bg-gradient-brand px-6 py-3 text-sm font-semibold text-primary-foreground shadow-glow"
+            className="mt-8 inline-flex items-center gap-2 bg-noir px-7 py-3.5 text-xs uppercase tracking-[0.3em] text-ivory transition hover:bg-gold hover:text-noir"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to blog
+            Back to the Journal
           </Link>
         </section>
       </Layout>
@@ -108,8 +109,6 @@ const BlogPost = () => {
   }
 
   const isoDate = toIsoDate(post.date);
-  const accent = post.background || "#fd5200";
-  const accentForeground = post.foreground || "#ffffff";
   const chapters = chunkParagraphs(post.content);
   const articleBody = post.bodyHtml ? stripHtml(post.bodyHtml) : post.content.join(" ");
   const wordCount = articleBody ? articleBody.split(/\s+/).filter(Boolean).length : 0;
@@ -119,9 +118,9 @@ const BlogPost = () => {
   return (
     <Layout hideBreadcrumb>
       <SEO
-        title={`${post.title} | Luxeholic Blog`}
+        title={`${post.title} | Luxeholic Journal`}
         description={post.excerpt}
-        keywords={`${post.tag}, electronics, tech guide, luxeholic`}
+        keywords={`${post.tag}, luxury fashion, style guide, luxeholic journal`}
         url={`/blog/${post.slug}`}
         type="article"
         publishedTime={isoDate}
@@ -129,7 +128,7 @@ const BlogPost = () => {
         structuredData={[
           breadcrumbSchema([
             { name: "Home", path: "/" },
-            { name: "Blog", path: "/blog" },
+            { name: "Journal", path: "/blog" },
             { name: post.title, path: `/blog/${post.slug}` },
           ]),
           {
@@ -156,257 +155,223 @@ const BlogPost = () => {
         ]}
       />
 
-      <ReadingProgressBar color={accent} />
+      <ReadingProgressBar />
 
-      {/* ── Full-bleed hero ─────────────────────────────────────────────── */}
-      <section className="relative flex min-h-screen w-full flex-col overflow-hidden bg-black text-white">
-        {post.video ? (
-          <video
-            src={post.video}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="none"
-            poster={post.image}
-            className="absolute inset-0 h-full w-full object-cover"
-            aria-hidden="true"
-          />
-        ) : post.image ? (
-          <img
-            src={post.image}
-            alt={post.title}
-            className="absolute inset-0 h-full w-full object-cover"
-            loading="eager"
-            width={1600}
-            height={1000}
-          />
-        ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/25" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(0,0,0,0.5),transparent_55%)]" />
-
-        <div className="relative z-10 flex flex-1 flex-col">
-          <div className="container pt-8">
-            <Link to="/blog" className="inline-flex items-center gap-2 text-sm text-white/70 transition-colors hover:text-white">
-              <ArrowLeft className="h-4 w-4" />
-              Back to blog
-            </Link>
-          </div>
-
-          <div className="container flex flex-1 flex-col items-start justify-center pb-20">
-            <p
-              className="mb-4 text-xs font-black uppercase tracking-[0.3em]"
-              style={{ color: accent }}
-            >
-              {post.tag}
-            </p>
-            <h1 className="max-w-4xl font-display text-4xl font-black leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl">
-              {post.title}
-            </h1>
-            <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/75 sm:text-lg">
-              {post.excerpt}
-            </p>
-            <span className="mt-6 inline-flex items-center gap-2 text-xs font-medium text-white/55">
-              <Calendar className="h-3.5 w-3.5" />
-              {post.date}
-            </span>
-          </div>
-
-          <div className="container flex justify-center pb-8">
-            <ChevronDown className="h-5 w-5 animate-bounce text-white/50" />
-          </div>
+      {/* ── Editorial hero ─────────────────────────────────────────────── */}
+      <article className="bg-ivory pb-24">
+        <div className="relative aspect-[16/9] w-full overflow-hidden bg-stone md:aspect-[21/9]">
+          {post.video ? (
+            <video
+              src={post.video}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="none"
+              poster={post.image}
+              className="absolute inset-0 h-full w-full object-cover"
+              aria-hidden="true"
+            />
+          ) : post.image ? (
+            <img
+              src={post.image}
+              alt={post.title}
+              className="absolute inset-0 h-full w-full object-cover"
+              loading="eager"
+              width={1600}
+              height={900}
+            />
+          ) : null}
+          <div className="absolute inset-0 bg-gradient-to-t from-noir/50 via-transparent to-transparent" />
         </div>
-      </section>
 
-      {/* ── Rich HTML content (imported from the team's own HTML/CSS) ────── */}
-      {post.bodyHtml ? (
-        <section className="container py-16 sm:py-24">
-          <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <article className="max-w-none">
-              <div
-                className="prose prose-lg dark:prose-invert w-full max-w-none prose-headings:font-display prose-img:rounded-2xl"
-                style={{ "--tw-prose-links": accent } as React.CSSProperties}
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.bodyHtml) }}
-              />
+        <div className="mx-auto max-w-3xl px-6 pt-14 md:px-0">
+          <Link
+            to="/blog"
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-noir/50 transition hover:text-gold"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to the Journal
+          </Link>
 
-              {post.images && post.images.length > 0 && (
-                <div className="mt-12">
-                  <h3 className="mb-4 font-display text-lg font-bold tracking-tight">Gallery</h3>
-                  <Carousel opts={{ loop: post.images.length > 1, align: "start" }} className="w-full">
-                    <CarouselContent>
-                      {post.images.map((src, index) => (
-                        <CarouselItem key={src} className="sm:basis-1/2">
-                          <div className="aspect-[4/3] overflow-hidden rounded-2xl">
-                            <img
-                              src={src}
-                              alt={`${post.title} — illustration ${index + 1}`}
-                              className="h-full w-full object-cover"
-                              loading="lazy"
-                              decoding="async"
-                              width={1200}
-                              height={900}
-                            />
-                          </div>
-                        </CarouselItem>
-                      ))}
-                    </CarouselContent>
-                    {post.images.length > 1 && (
-                      <>
-                        <CarouselPrevious className="-left-4" />
-                        <CarouselNext className="-right-4" />
-                      </>
-                    )}
-                  </Carousel>
-                </div>
-              )}
-            </article>
+          <p className="eyebrow mt-8">{post.tag}</p>
+          <h1 className="mt-4 font-serif text-4xl leading-tight text-balance md:text-6xl">{post.title}</h1>
+          <p className="mt-5 flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-noir/50">
+            <Calendar className="h-3.5 w-3.5" />
+            {post.date} · {readMinutes} min read
+          </p>
 
-            <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-              <div className="rounded-2xl border border-border p-5">
-                <span
-                  className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.2em]"
-                  style={{ color: accent }}
-                >
-                  <Tag className="h-3.5 w-3.5" />
-                  {post.tag}
-                </span>
-                <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  {post.date}
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">{readMinutes} min read</p>
+          <div className="gold-line mt-10 h-px w-full" />
+
+          <p className="mt-10 text-lg font-light leading-relaxed text-noir/70 md:text-xl">
+            {post.excerpt}
+          </p>
+        </div>
+
+        {/* ── Rich HTML content (imported from the team's own HTML/CSS) ──── */}
+        {post.bodyHtml ? (
+          <div className="mx-auto mt-16 max-w-6xl px-6 md:px-10">
+            <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="max-w-none">
+                <div
+                  className="prose prose-lg w-full max-w-none prose-headings:font-serif prose-headings:font-normal prose-img:rounded-none prose-a:text-gold"
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.bodyHtml) }}
+                />
+
+                {post.images && post.images.length > 0 && (
+                  <div className="mt-14">
+                    <p className="eyebrow">Gallery</p>
+                    <Carousel opts={{ loop: post.images.length > 1, align: "start" }} className="mt-6 w-full">
+                      <CarouselContent>
+                        {post.images.map((src, index) => (
+                          <CarouselItem key={src} className="sm:basis-1/2">
+                            <div className="aspect-[4/3] overflow-hidden bg-stone">
+                              <img
+                                src={src}
+                                alt={`${post.title} — illustration ${index + 1}`}
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                                decoding="async"
+                                width={1200}
+                                height={900}
+                              />
+                            </div>
+                          </CarouselItem>
+                        ))}
+                      </CarouselContent>
+                      {post.images.length > 1 && (
+                        <>
+                          <CarouselPrevious className="-left-4" />
+                          <CarouselNext className="-right-4" />
+                        </>
+                      )}
+                    </Carousel>
+                  </div>
+                )}
               </div>
 
-              {relatedPosts.length > 0 && (
-                <div className="rounded-2xl border border-border p-5">
-                  <h3 className="font-display text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
-                    More from the blog
-                  </h3>
-                  <div className="mt-4 space-y-4">
-                    {relatedPosts.map((related) => (
-                      <Link
-                        key={related._id}
-                        to={`/blog/${related.slug}`}
-                        className="group flex gap-3"
-                      >
-                        {related.image && (
-                          <img
-                            src={related.image}
-                            alt=""
-                            className="h-14 w-14 shrink-0 rounded-lg object-cover"
-                            loading="lazy"
-                          />
-                        )}
-                        <div>
-                          <p className="text-sm font-semibold leading-snug transition-colors group-hover:text-primary">
-                            {related.title}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">{related.date}</p>
-                        </div>
-                      </Link>
+              <aside className="space-y-8 lg:sticky lg:top-24 lg:self-start">
+                <div className="border border-noir/15 p-6">
+                  <p className="eyebrow flex items-center gap-1.5">
+                    <Tag className="h-3.5 w-3.5" />
+                    {post.tag}
+                  </p>
+                  <div className="mt-4 flex items-center gap-2 text-sm text-noir/60">
+                    <Calendar className="h-4 w-4" />
+                    {post.date}
+                  </div>
+                  <p className="mt-2 text-sm text-noir/60">{readMinutes} min read</p>
+                </div>
+
+                {relatedPosts.length > 0 && (
+                  <div className="border border-noir/15 p-6">
+                    <p className="text-xs uppercase tracking-[0.2em] text-noir/50">More from the Journal</p>
+                    <div className="mt-5 space-y-5">
+                      {relatedPosts.map((related) => (
+                        <Link key={related._id} to={`/blog/${related.slug}`} className="group flex gap-3">
+                          {related.image && (
+                            <img
+                              src={related.image}
+                              alt=""
+                              className="h-14 w-14 shrink-0 object-cover"
+                              loading="lazy"
+                            />
+                          )}
+                          <div>
+                            <p className="font-serif text-base leading-snug transition-colors group-hover:text-gold">
+                              {related.title}
+                            </p>
+                            <p className="mt-1 text-[11px] uppercase tracking-[0.15em] text-noir/45">
+                              {related.date}
+                            </p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <Link
+                  to="/shop"
+                  className="block bg-noir px-5 py-4 text-center text-xs uppercase tracking-[0.3em] text-ivory transition hover:bg-gold hover:text-noir"
+                >
+                  Shop the Edit
+                </Link>
+              </aside>
+            </div>
+          </div>
+        ) : (
+          <div className="mx-auto max-w-2xl px-6 md:px-0">
+            {chapters.map((chapter, index) => {
+              const galleryImage = post.images?.[index];
+
+              const sectionLabel = (
+                <div className="mb-5 flex items-center justify-center gap-4">
+                  <span className="font-serif text-sm tracking-widest text-gold">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span className="h-px w-16 bg-noir/15" />
+                  <span className="text-xs font-medium text-noir/40">
+                    {String(chapters.length).padStart(2, "0")}
+                  </span>
+                </div>
+              );
+
+              return (
+                <div key={chapter[0]} className="mt-16 first:mt-16">
+                  {galleryImage && (
+                    <div className="relative mb-10 aspect-[16/10] w-full overflow-hidden bg-stone">
+                      <img
+                        src={galleryImage}
+                        alt={`${post.title} — ${post.tag} illustration ${index + 1}`}
+                        className="absolute inset-0 h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                        width={1600}
+                        height={1000}
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-5 text-center">
+                    {sectionLabel}
+                    {chapter.map((paragraph) => (
+                      <p key={paragraph} className="text-lg font-light leading-relaxed text-noir/75">
+                        {paragraph}
+                      </p>
                     ))}
                   </div>
                 </div>
-              )}
-
-              <Link
-                to="/shop"
-                className="block rounded-2xl px-5 py-4 text-center text-sm font-bold transition-transform hover:-translate-y-0.5"
-                style={{ backgroundColor: accent, color: accentForeground }}
-              >
-                Shop related gear
-              </Link>
-            </aside>
+              );
+            })}
           </div>
-        </section>
-      ) : (
-        chapters.map((chapter, index) => {
-        const tinted = index % 2 === 1;
-        const galleryImage = post.images?.[index];
-
-        const sectionLabel = (
-          <div className="mb-5 flex items-center justify-center gap-4">
-            <span className="font-display text-sm font-black tracking-widest" style={{ color: accent }}>
-              {String(index + 1).padStart(2, "0")}
-            </span>
-            <span className="h-px w-16" style={{ backgroundColor: `${accent}33` }} />
-            <span className="text-xs font-medium text-muted-foreground">
-              {String(chapters.length).padStart(2, "0")}
-            </span>
-          </div>
-        );
-
-        const chapterText = (
-          <div className="mx-auto w-full max-w-2xl space-y-4 text-center">
-            {sectionLabel}
-            {chapter.map((paragraph) => (
-              <p key={paragraph} className="text-lg leading-relaxed text-foreground/85 sm:text-xl">
-                {paragraph}
-              </p>
-            ))}
-          </div>
-        );
-
-        if (galleryImage) {
-          return (
-            <section key={chapter[0]} className="border-y border-border/60">
-              <div className="relative h-[55vh] w-full overflow-hidden sm:h-[70vh]">
-                <img
-                  src={galleryImage}
-                  alt={`${post.title} — ${post.tag} illustration ${index + 1}`}
-                  className="absolute inset-0 h-full w-full object-cover"
-                  loading="lazy"
-                  decoding="async"
-                  width={1920}
-                  height={1080}
-                />
-              </div>
-              <div className="container py-12 sm:py-16">
-                {chapterText}
-              </div>
-            </section>
-          );
-        }
-
-        return (
-          <section
-            key={chapter[0]}
-            className={tinted ? "border-y border-border/60" : ""}
-            style={tinted ? { backgroundColor: `${accent}0d` } : undefined}
-          >
-            <div className="container py-12 sm:py-16">
-              {chapterText}
-            </div>
-          </section>
-        );
-        })
-      )}
+        )}
+      </article>
 
       {/* ── Closing CTA ─────────────────────────────────────────────────── */}
-      <section
-        className="flex min-h-[50vh] flex-col items-center justify-center px-4 py-20 text-center"
-        style={{ backgroundColor: accent, color: accentForeground }}
-      >
-        <h2 className="font-display text-3xl font-black tracking-tight sm:text-5xl">
-          Ready to upgrade your setup?
-        </h2>
-        <p className="mt-4 max-w-xl text-base opacity-85 sm:text-lg">
-          Explore the gear we curated to go with this story.
-        </p>
-        <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            to="/shop"
-            className="inline-flex items-center gap-2 rounded-full bg-black px-7 py-3.5 text-sm font-semibold text-white shadow-lg transition-transform hover:-translate-y-0.5"
-          >
-            Shop related gear <ArrowRight className="h-4 w-4" />
-          </Link>
-          <Link
-            to="/blog"
-            className="inline-flex items-center gap-2 rounded-full border px-7 py-3.5 text-sm font-semibold transition-colors"
-            style={{ borderColor: `${accentForeground}55` }}
-          >
-            More articles
-          </Link>
+      <section className="relative flex min-h-[45vh] flex-col items-center justify-center overflow-hidden bg-burgundy px-6 py-20 text-center text-ivory">
+        <div className="grain absolute inset-0 opacity-50" />
+        <div className="relative">
+          <p className="eyebrow text-gold">Shop the Story</p>
+          <h2 className="mt-4 font-serif text-3xl text-balance sm:text-5xl">
+            Ready for Your Next <span className="italic">Piece</span>?
+          </h2>
+          <p className="mt-4 max-w-xl font-light text-ivory/70 sm:text-lg">
+            Explore the collection we curated to go with this story.
+          </p>
+          <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
+            <Link
+              to="/shop"
+              className="inline-flex items-center gap-2 bg-gold px-7 py-3.5 text-xs uppercase tracking-[0.3em] text-noir transition hover:bg-gold-soft"
+            >
+              Shop the Edit <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              to="/blog"
+              className="inline-flex items-center gap-2 border border-ivory/40 px-7 py-3.5 text-xs uppercase tracking-[0.3em] text-ivory transition hover:border-gold hover:text-gold"
+            >
+              More Stories
+            </Link>
+          </div>
         </div>
       </section>
     </Layout>

@@ -50,13 +50,13 @@ const FAQ = () => {
       />
 
       <CustomerServiceLayout title="Frequently Asked Questions" heroImage="/a6.jpg" heroAlt="Luxeholic customer questions and support">
-        <Accordion type="single" collapsible className="w-full border-t border-neutral-200">
+        <Accordion type="single" collapsible className="w-full border-t border-border">
           {faqs.map((item, index) => (
-            <AccordionItem key={item.q} value={`faq-${index}`} className="border-neutral-200">
-              <AccordionTrigger className="py-6 text-left text-lg font-semibold leading-snug text-neutral-950 hover:no-underline sm:text-xl">
+            <AccordionItem key={item.q} value={`faq-${index}`} className="border-border">
+              <AccordionTrigger className="py-6 text-left font-serif text-xl font-light leading-snug text-noir hover:text-gold hover:no-underline sm:text-2xl">
                 {item.q}
               </AccordionTrigger>
-              <AccordionContent className="pb-7 text-base leading-8 text-neutral-500 sm:text-lg sm:leading-9">
+              <AccordionContent className="pb-7 text-base leading-8 text-noir/70 sm:text-lg sm:leading-9">
                 {item.a}
               </AccordionContent>
             </AccordionItem>

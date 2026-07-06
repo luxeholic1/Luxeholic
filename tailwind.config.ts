@@ -60,6 +60,17 @@ export default {
           ring: "hsl(var(--sidebar-ring))",
         },
         skeleton: "hsl(var(--skeleton))",
+
+        /* Designer-maison luxury palette (matches the reference design) */
+        ivory: "hsl(var(--ivory))",
+        beige: "hsl(var(--beige))",
+        gold: {
+          DEFAULT: "hsl(var(--gold))",
+          soft: "hsl(var(--gold-soft))",
+        },
+        noir: "hsl(var(--noir))",
+        stone: "hsl(var(--stone))",
+        burgundy: "hsl(var(--burgundy))",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -67,7 +78,8 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        display: ['"Space Grotesk"', 'sans-serif'],
+        display: ['"Cormorant Garamond"', '"Playfair Display"', 'ui-serif', 'Georgia', 'serif'],
+        serif: ['"Cormorant Garamond"', '"Playfair Display"', 'ui-serif', 'Georgia', 'serif'],
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       backgroundImage: {

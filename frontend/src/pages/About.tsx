@@ -7,41 +7,41 @@ const values = [
   {
     icon: Sparkles,
     title: "Curated, not crowded",
-    text: "Every category is shaped around useful upgrades, reliable accessories and refined everyday tech.",
+    text: "Every collection is shaped around considered pieces, enduring craftsmanship and refined everyday luxury.",
   },
   {
     icon: ShieldCheck,
     title: "Quality-first sourcing",
-    text: "We focus on products that balance performance, design, build quality and long-term practicality.",
+    text: "We focus on pieces that balance heritage, design integrity, materials and long-term craftsmanship.",
   },
   {
     icon: Truck,
-    title: "Built for modern buyers",
-    text: "Clear browsing, fast discovery and dependable shopping support across essentials and premium gear.",
+    title: "Built for the discerning",
+    text: "Clear browsing, considered discovery and dependable service across essentials and signature pieces.",
   },
   {
     icon: Headphones,
-    title: "Support that understands tech",
-    text: "From device compatibility to accessory selection, the experience is designed to feel simple.",
+    title: "Care that understands luxury",
+    text: "From sizing to styling, the experience is designed to feel effortless and personal.",
   },
 ];
 
-const milestones = ["Premium Electronics", "Mobile Parts", "Tech Accessories", "Smart Wearables", "Creator Equipment"];
+const milestones = ["Designer Handbags", "Fine Footwear", "Tailored Clothing", "Signature Accessories", "Atelier Edits"];
 
 const About = () => {
   return (
     <Layout>
       <SEO
         title="Our Story & Philosophy — Luxeholic"
-        description="Discover the vision behind Luxeholic. We curate high-performance electronics, reliable replacement parts, and lifestyle tech accessories for tech enthusiasts."
-        keywords="about luxeholic, premium electronics store, tech store India, electronics Australia"
+        description="Discover the vision behind Luxeholic. We curate designer handbags, fine footwear and refined accessories for those who value quality and craftsmanship."
+        keywords="about luxeholic, luxury handbags store, designer accessories India, luxury fashion Australia"
         url="https://luxeholic.in/about"
         structuredData={{
           "@context": "https://schema.org",
           "@type": "AboutPage",
           "name": "About Luxeholic",
           "url": "https://luxeholic.in/about",
-          "description": "Luxeholic curates premium electronics for India, Australia and New Zealand.",
+          "description": "Luxeholic curates designer handbags, footwear and accessories for India, Australia and New Zealand.",
           "publisher": {
             "@type": "Organization",
             "name": "Luxeholic",
@@ -51,142 +51,140 @@ const About = () => {
         }}
       />
 
-      <main className="bg-background">
-        <section className="container py-10 sm:py-12 lg:py-14">
-          <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-stretch">
-            <div className="rounded-2xl border border-border bg-card/85 p-6 shadow-sm backdrop-blur sm:p-8 lg:p-10 flex flex-col justify-between">
+      <main className="bg-ivory">
+        <section className="container py-14 sm:py-16 lg:py-20">
+          <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-stretch">
+            <div className="border border-border bg-card p-6 sm:p-8 lg:p-12 flex flex-col justify-between">
               <div>
-                <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-primary">Our Vision</p>
-                  <h1 className="font-display text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-3xl">
-                     Premium Electronics & Tech Accessories, Selected with Intention
-                  </h1>
-                {/*  Improved descriptive sentence with rich keywords */}
-                <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-                 Luxeholic bridges the gap between high-performance technology and modern lifestyles. We curate premium electronics, mobile parts and everyday tech accessories that combine reliable performance, refined design and practical usability for work, travel and daily life.
+                <p className="eyebrow">Our Vision</p>
+                <h1 className="mt-4 font-serif text-4xl font-light tracking-tight text-noir sm:text-5xl text-balance">
+                  Designer Pieces, Selected with Intention
+                </h1>
+                <div className="gold-line mt-6 h-px w-24" />
+                <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+                  Luxeholic bridges the gap between heritage craftsmanship and modern living. We curate designer handbags, fine footwear, tailored clothing and signature accessories that combine enduring quality, refined design and everyday wearability.
                 </p>
-                <div className="mt-7 flex flex-wrap gap-2">
+                <div className="mt-8 flex flex-wrap gap-2">
                   {milestones.map((item) => (
-                    <span key={item} className="rounded-full border border-border bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground">
+                    <span key={item} className="border border-border bg-ivory px-3 py-1.5 text-xs uppercase tracking-[0.15em] text-muted-foreground">
                       {item}
                     </span>
                   ))}
                 </div>
 
-                {/*  Brand Trust Metrics Grid added dynamically */}
-                <div className="grid grid-cols-3 gap-4 border-t border-border/60 pt-6 mt-8 text-left">
+                <div className="grid grid-cols-3 gap-4 border-t border-border pt-6 mt-9 text-left">
                   <div>
-                    <p className="text-xl font-bold text-foreground sm:text-1xl">Premium</p>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Electronics</p>
+                    <p className="font-serif text-2xl font-light text-noir">Designer</p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-medium">Handbags</p>
                   </div>
                   <div>
-                    <p className="text-xl font-bold text-foreground sm:text-1xl">Mobile</p>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Parts</p>
+                    <p className="font-serif text-2xl font-light text-noir">Fine</p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-medium">Footwear</p>
                   </div>
                   <div>
-                    <p className="text-xl font-bold text-foreground sm:text-1xl">Smart</p>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Accessories</p>
+                    <p className="font-serif text-2xl font-light text-noir">Signature</p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-medium">Accessories</p>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row pt-4">
+              <div className="mt-9 flex flex-col gap-3 sm:flex-row pt-4">
                 <Link
                   to="/shop"
-                  className="group inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+                  className="group inline-flex items-center justify-center gap-2 bg-noir px-5 py-3 text-sm font-medium uppercase tracking-[0.15em] text-ivory transition hover:bg-gold hover:text-noir"
                 >
-                  Shop products
+                  Shop the Collection
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Link>
                 <Link
                   to="/categories"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-5 py-3 text-sm font-semibold text-foreground transition hover:bg-muted"
+                  className="inline-flex items-center justify-center gap-2 border border-border bg-ivory px-5 py-3 text-sm font-medium uppercase tracking-[0.15em] text-noir transition hover:border-gold"
                 >
-                  Explore Tech Categories
+                  Explore Categories
                 </Link>
               </div>
             </div>
 
-            <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm group">
-              <img 
-                src="/a3.jpg" 
+            <div className="relative overflow-hidden border border-border bg-card group">
+              <img
+                src="/a3.jpg"
                 loading="eager"
                 decoding="async"
-                alt="Sleek modern tech workspace with premium gadgets curated by Luxeholic" 
-                className="h-full min-h-[360px] w-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                alt="Refined display of designer handbags and accessories curated by Luxeholic"
+                className="hover-zoom-img h-full min-h-[360px] w-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-              <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-white/20 bg-white/12 p-5 text-white        shadow-2xl backdrop-blur-xl">
-                <p className="text-xs font-semibold uppercase tracking-widest text-white/70">Our philosophy</p>
-                <h2 className="mt-2 font-display text-2xl font-bold leading-tight">Smart, by choice.</h2>
-                <p className="mt-2 text-sm leading-relaxed text-white/75">
-                  Useful technology should feel premium before checkout and dependable long after delivery.
+              <div className="absolute inset-0 bg-gradient-to-t from-noir/80 via-noir/20 to-transparent" />
+              <div className="absolute inset-x-4 bottom-4 border border-white/20 bg-white/10 p-5 text-ivory backdrop-blur-xl">
+                <p className="eyebrow">Our Philosophy</p>
+                <h2 className="mt-2 font-serif text-2xl font-light leading-tight">Refined, by choice.</h2>
+                <p className="mt-2 text-sm leading-relaxed text-ivory/75">
+                  Considered luxury should feel exceptional before checkout and dependable long after delivery.
                 </p>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="container pb-10 sm:pb-12 lg:pb-14">
+        <section className="container pb-14 sm:pb-16 lg:pb-20">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {values.map((item) => (
-              <article key={item.title} className="rounded-2xl border border-border bg-card/85 p-5 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg">
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-muted text-primary">
+              <article key={item.title} className="border border-border bg-card p-6 transition hover:border-gold/50">
+                <div className="mb-5 flex h-11 w-11 items-center justify-center border border-border bg-ivory text-gold">
                   <item.icon className="h-5 w-5" />
                 </div>
-                <h3 className="font-display text-lg font-bold text-foreground">{item.title}</h3>
+                <h3 className="font-serif text-xl font-light text-noir">{item.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.text}</p>
               </article>
             ))}
           </div>
         </section>
 
-         <section className="container pb-10">
-            <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-primary">
-                    Why Luxeholic
-                </p>
-                <h2 className="font-display text-3xl font-bold text-foreground">
-                    Built for people who value quality over clutter
-                </h2>
-                <p className="mt-4 text-muted-foreground leading-relaxed">
-                  The technology market is crowded with endless choices.
-                  Luxeholic was created to simplify discovery by focusing on
-                  premium electronics, trusted accessories and device parts
-                  that deliver real value, dependable performance and refined design.
-                </p>
-                <Link
-                 to="/shop"
-                 className="mt-6 inline-flex items-center gap-2 rounded-xl border border-black bg-white px-5 py-3 text-sm font-semibold text-black transition-all duration-300 hover:bg-black hover:text-white"
-                >
-                Explore Our Collection
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Link>
-              </div>
+        <section className="container pb-14">
+          <div className="border border-border bg-card p-6 sm:p-10">
+            <p className="eyebrow">Why Luxeholic</p>
+            <h2 className="mt-4 font-serif text-3xl font-light text-noir text-balance">
+              Built for people who value quality over clutter
+            </h2>
+            <div className="gold-line mt-6 h-px w-24" />
+            <p className="mt-6 text-muted-foreground leading-relaxed max-w-2xl">
+              The luxury market is crowded with endless choices.
+              Luxeholic was created to simplify discovery by focusing on
+              designer handbags, fine footwear and signature accessories
+              that deliver real value, enduring craftsmanship and refined design.
+            </p>
+            <Link
+              to="/shop"
+              className="mt-7 inline-flex items-center gap-2 border border-noir bg-ivory px-5 py-3 text-sm font-medium uppercase tracking-[0.15em] text-noir transition-all duration-300 hover:bg-noir hover:text-ivory"
+            >
+              Explore Our Collection
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+          </div>
         </section>
 
-        <section className="container pb-16 sm:pb-20 lg:pb-24">
-          <div className="grid gap-6 rounded-2xl border border-border bg-card/85 p-6 shadow-sm backdrop-blur sm:p-8 lg:grid-cols-[0.8fr_1.2fr] lg:p-10">
+        <section className="container pb-20 sm:pb-24 lg:pb-28">
+          <div className="grid gap-8 border border-border bg-card p-6 sm:p-8 lg:grid-cols-[0.8fr_1.2fr] lg:p-12">
             <div>
-              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-primary">What drives us</p>
-              {/* Premium philosophical headline change */}
-              <h2 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl leading-tight">
-                Electronics should feel sharp, useful and easy to choose
+              <p className="eyebrow">What drives us</p>
+              <h2 className="mt-4 font-serif text-3xl font-light tracking-tight text-noir sm:text-4xl leading-tight text-balance">
+                Luxury should feel considered, personal and easy to choose
               </h2>
+              <div className="gold-line mt-6 h-px w-16" />
             </div>
             <div className="space-y-5 text-sm leading-relaxed text-muted-foreground sm:text-base">
               <p>
-                We started Luxeholic with a clear idea: technology is not only about specs. It is part of your workspace,
+                We started Luxeholic with a clear idea: luxury is not only about the label. It is part of your wardrobe,
                 your travel kit, your daily rhythm and the way you present yourself.
               </p>
               <p>
                 That is why our store puts selection first. Instead of overwhelming buyers with endless noise, we organize
-                products around categories that matter: device parts, trusted accessories, smart wearables, audio, creator
-                tools and everyday electronics.
+                pieces around categories that matter: designer handbags, fine footwear, tailored clothing, jewellery and
+                everyday accessories.
               </p>
               <ul className="grid gap-3 pt-2 sm:grid-cols-2 list-none pl-0">
-                {["Refined catalog experience", "Useful premium accessories", "Clear product discovery", "Practical tech support"].map((item) => (
-                  <li key={item} className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">
-                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                {["Refined catalog experience", "Considered luxury accessories", "Clear product discovery", "Personal customer care"].map((item) => (
+                  <li key={item} className="flex items-center gap-2 border border-border bg-ivory px-3 py-2 text-sm font-medium text-noir">
+                    <CheckCircle2 className="h-4 w-4 text-gold shrink-0" />
                     <span>{item}</span>
                   </li>
                 ))}

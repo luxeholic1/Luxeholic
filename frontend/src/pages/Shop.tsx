@@ -141,11 +141,11 @@ function Pagination({ page, total, pageSize, onChange }: {
   }
 
   return (
-    <div className="flex items-center justify-center gap-1.5 mt-12">
+    <div className="flex items-center justify-center gap-1.5 mt-14">
       <button
         onClick={() => onChange(page - 1)}
         disabled={page === 1}
-        className="h-9 w-9 rounded-full border border-border flex items-center justify-center hover:border-primary/50 hover:bg-secondary/50 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+        className="h-9 w-9 border border-border flex items-center justify-center hover:border-gold hover:text-gold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
@@ -157,10 +157,10 @@ function Pagination({ page, total, pageSize, onChange }: {
           <button
             key={p}
             onClick={() => onChange(p as number)}
-            className={`h-9 w-9 rounded-full text-sm font-medium transition-all ${
+            className={`h-9 w-9 text-sm font-medium transition-all ${
               p === page
-                ? "bg-gradient-brand text-primary-foreground shadow-glow"
-                : "border border-border hover:border-primary/50 hover:bg-secondary/50"
+                ? "bg-noir text-ivory"
+                : "border border-border hover:border-gold hover:text-gold"
             }`}
           >
             {p}
@@ -171,7 +171,7 @@ function Pagination({ page, total, pageSize, onChange }: {
       <button
         onClick={() => onChange(page + 1)}
         disabled={page === totalPages}
-        className="h-9 w-9 rounded-full border border-border flex items-center justify-center hover:border-primary/50 hover:bg-secondary/50 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+        className="h-9 w-9 border border-border flex items-center justify-center hover:border-gold hover:text-gold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
       >
         <ChevronRight className="h-4 w-4" />
       </button>
@@ -210,25 +210,25 @@ function ShopSidebar({
   );
 
   return (
-    <aside className="rounded-xl border border-border bg-card shadow-sm">
-      <div className="flex items-center justify-between border-b border-border px-3 py-3">
+    <aside className="border border-border bg-card">
+      <div className="flex items-center justify-between border-b border-border px-4 py-4">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Filters</p>
-          <h2 className="mt-1 font-display text-base font-bold">Browse Store</h2>
+          <p className="eyebrow">Filters</p>
+          <h2 className="mt-1 font-serif text-lg">Refine the Edit</h2>
         </div>
-        <button onClick={onClear} className="text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground">
+        <button onClick={onClear} className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-gold">
           Reset
         </button>
       </div>
 
-      <div className="space-y-4 p-3">
+      <div className="space-y-5 p-4">
         <div>
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Department</h3>
+          <h3 className="eyebrow mb-2">Department</h3>
           <div className="space-y-1">
             <button
               onClick={() => onCategoryChange("all")}
-              className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
-                activeCat === "all" ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
+              className={`flex w-full items-center justify-between px-2.5 py-1.5 text-left text-xs transition-colors ${
+                activeCat === "all" ? "bg-noir text-ivory" : "text-foreground hover:bg-muted"
               }`}
             >
               <span className="font-medium">All Products</span>
@@ -238,8 +238,8 @@ function ShopSidebar({
               <button
                 key={cat.slug}
                 onClick={() => onCategoryChange(cat.slug)}
-                className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
-                  activeCat === cat.slug ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                className={`flex w-full items-center justify-between px-2.5 py-1.5 text-left text-xs transition-colors ${
+                  activeCat === cat.slug ? "bg-noir text-ivory" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 <span className="truncate font-medium">{cat.name}</span>
@@ -250,11 +250,11 @@ function ShopSidebar({
         </div>
 
         <div className="border-t border-border pt-4">
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Sort By</h3>
+          <h3 className="eyebrow mb-2">Sort By</h3>
           <select
             value={sort}
             onChange={(e) => onSortChange(e.target.value)}
-            className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-medium outline-none transition-colors focus:border-primary"
+            className="h-9 w-full border border-border bg-background px-3 text-xs font-medium outline-none transition-colors focus:border-gold"
           >
             <option value="featured">Featured</option>
             <option value="new">Latest Arrivals</option>
@@ -265,14 +265,14 @@ function ShopSidebar({
         </div>
 
         <div className="border-t border-border pt-4">
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Price</h3>
+          <h3 className="eyebrow mb-2">Price</h3>
           <div className="space-y-1">
             {PRICE_RANGES.map((range) => (
               <button
                 key={range.value}
                 onClick={() => onPriceChange(range.value)}
-                className={`flex w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-colors ${
-                  priceRange === range.value ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                className={`flex w-full px-2.5 py-1.5 text-left text-xs font-medium transition-colors ${
+                  priceRange === range.value ? "bg-gold/15 text-gold" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 {range.label}
@@ -282,14 +282,14 @@ function ShopSidebar({
         </div>
 
         <div className="border-t border-border pt-4">
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Rating</h3>
+          <h3 className="eyebrow mb-2">Rating</h3>
           <div className="space-y-1">
             {[0, 4, 4.5].map((rating) => (
               <button
                 key={rating}
                 onClick={() => onRatingChange(rating)}
-                className={`flex w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-colors ${
-                  minRating === rating ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                className={`flex w-full px-2.5 py-1.5 text-left text-xs font-medium transition-colors ${
+                  minRating === rating ? "bg-gold/15 text-gold" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 {rating === 0 ? "All ratings" : `${rating}+ stars`}
@@ -450,12 +450,12 @@ const Shop = () => {
   const Skeleton = () => (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7">
       {Array.from({ length: 12 }).map((_, i) => (
-        <div key={i} className="rounded-xl bg-card border border-border animate-pulse">
-          <div className="aspect-square bg-secondary/40 mb-3" />
+        <div key={i} className="bg-card border border-border animate-pulse">
+          <div className="aspect-square bg-stone mb-3" />
           <div className="px-3 pb-3">
-          <div className="h-3 w-1/3 bg-secondary/40 rounded mb-2" />
-          <div className="h-4 w-3/4 bg-secondary/40 rounded mb-3" />
-          <div className="h-6 w-1/2 bg-secondary/40 rounded" />
+          <div className="h-3 w-1/3 bg-stone mb-2" />
+          <div className="h-4 w-3/4 bg-stone mb-3" />
+          <div className="h-6 w-1/2 bg-stone" />
           </div>
         </div>
       ))}
@@ -466,8 +466,8 @@ const Shop = () => {
     <Layout>
       <SEO
         title={pageTitle}
-        description={`Browse ${totalCount.toLocaleString()} premium electronics. Check availability, product coverage, and shipping options before checkout.`}
-        keywords={searchQuery ? `${searchQuery}, electronics, gadgets` : "electronics, gadgets, smartphones, laptops"}
+        description={`Browse ${totalCount.toLocaleString()} pieces from the Luxeholic collection. Check availability, craftsmanship details, and shipping options before checkout.`}
+        keywords={searchQuery ? `${searchQuery}, luxury, handbags, shoes` : "luxury, handbags, shoes, accessories, designer"}
         url="/shop"
         structuredData={[
           breadcrumbSchema([
@@ -515,24 +515,24 @@ const Shop = () => {
           </div>
 
           <div className="min-w-0">
-            <div className="mb-4 rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
+            <div className="mb-4 border border-border bg-card p-4 sm:p-5">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
-                  <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-primary">
+                  <div className="eyebrow inline-flex items-center gap-2">
                     {searchQuery ? <Search className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
-                    {searchQuery ? "Search Results" : "Marketplace"}
+                    {searchQuery ? "Search Results" : "Shop All"}
                   </div>
-                  <h1 className="mt-2 font-display text-xl font-extrabold tracking-tight text-foreground sm:text-2xl">
+                  <h1 className="mt-2 font-serif text-2xl font-light tracking-tight text-foreground sm:text-3xl">
                     {searchQuery
                       ? `Results for "${searchQuery}"`
                       : activeCat !== "all"
                         ? categories.find(c => c.slug === activeCat)?.name || "Products"
-                        : "All Products"}
+                        : "The Full Collection"}
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {loading
-                      ? "Loading products..."
-                      : `${list.length.toLocaleString()} products matched${hydratingAll ? " · syncing more" : ""}`}
+                      ? "Loading collection..."
+                      : `${list.length.toLocaleString()} pieces found${hydratingAll ? " · syncing more" : ""}`}
                   </p>
                 </div>
 
@@ -542,7 +542,7 @@ const Shop = () => {
                       value={activeCat}
                       onChange={(e) => setCat(e.target.value)}
                       aria-label="Select category"
-                      className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-xs font-medium outline-none focus:border-primary"
+                      className="h-9 min-w-0 flex-1 border border-border bg-background px-3 text-xs font-medium outline-none focus:border-gold"
                     >
                       <option value="all">All Departments</option>
                       {categories.map(c => (
@@ -552,7 +552,7 @@ const Shop = () => {
                     <select
                       value={sort}
                       onChange={(e) => { setSort(e.target.value); setPage(1); }}
-                      className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-xs font-medium outline-none focus:border-primary"
+                      className="h-9 min-w-0 flex-1 border border-border bg-background px-3 text-xs font-medium outline-none focus:border-gold"
                     >
                       <option value="featured">Featured</option>
                       <option value="new">Latest</option>
@@ -565,7 +565,7 @@ const Shop = () => {
                   {searchQuery && (
                     <button
                       onClick={clearSearch}
-                      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold transition-colors hover:border-primary/40 hover:text-primary"
+                      className="inline-flex h-9 items-center justify-center gap-2 border border-border px-3 text-xs font-semibold transition-colors hover:border-gold hover:text-gold"
                     >
                       <X className="h-4 w-4" />
                       Clear search
@@ -573,7 +573,7 @@ const Shop = () => {
                   )}
 
                   {!loading && totalCount > PAGE_SIZE && (
-                    <span className="inline-flex h-9 items-center justify-center rounded-lg bg-muted px-3 text-xs font-semibold text-muted-foreground">
+                    <span className="inline-flex h-9 items-center justify-center bg-muted px-3 text-xs font-semibold text-muted-foreground">
                       {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount.toLocaleString()}
                     </span>
                   )}
@@ -584,19 +584,19 @@ const Shop = () => {
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
                   <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Active</span>
                   {activeCat !== "all" && (
-                    <button onClick={() => setCat("all")} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold">
+                    <button onClick={() => setCat("all")} className="inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-xs font-semibold hover:border-gold hover:text-gold">
                       {categories.find(c => c.slug === activeCat)?.name}
                       <X className="h-3 w-3" />
                     </button>
                   )}
                   {priceRange !== "all" && (
-                    <button onClick={() => { setPriceRange("all"); setPage(1); }} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold">
+                    <button onClick={() => { setPriceRange("all"); setPage(1); }} className="inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-xs font-semibold hover:border-gold hover:text-gold">
                       {PRICE_RANGES.find((range) => range.value === priceRange)?.label}
                       <X className="h-3 w-3" />
                     </button>
                   )}
                   {minRating > 0 && (
-                    <button onClick={() => { setMinRating(0); setPage(1); }} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold">
+                    <button onClick={() => { setMinRating(0); setPage(1); }} className="inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-xs font-semibold hover:border-gold hover:text-gold">
                       {minRating}+ stars
                       <X className="h-3 w-3" />
                     </button>
@@ -607,9 +607,9 @@ const Shop = () => {
 
             {/* ── Error ── */}
             {error && (
-              <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 mb-6">
-                <p className="text-sm text-red-400 font-medium">Failed to load products</p>
-                <p className="text-xs text-red-400/70 mt-1">{error}</p>
+              <div className="border border-burgundy/30 bg-burgundy/5 p-4 mb-6">
+                <p className="text-sm text-burgundy font-medium">Failed to load products</p>
+                <p className="text-xs text-burgundy/70 mt-1">{error}</p>
               </div>
             )}
 
@@ -617,15 +617,16 @@ const Shop = () => {
             {loading ? (
               <Skeleton />
             ) : list.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-28 text-center">
+              <div className="flex flex-col items-center justify-center border border-border bg-card py-28 text-center">
                 <Search className="mb-5 h-10 w-10 text-muted-foreground" />
-                <h3 className="font-display font-bold text-2xl mb-2">No products found</h3>
+                <p className="eyebrow mb-2">No Matches</p>
+                <h3 className="font-serif text-2xl font-light mb-2">Nothing found</h3>
                 <p className="text-muted-foreground mb-6 max-w-sm">
                   Try changing department, price, rating, or search keyword.
                 </p>
                 <button
                   onClick={resetFilters}
-                  className="px-6 py-3 rounded-full bg-foreground text-background text-sm font-semibold shadow-sm"
+                  className="px-6 py-3 border border-noir bg-noir text-ivory text-xs uppercase tracking-[0.25em] font-semibold transition hover:bg-transparent hover:text-noir"
                 >
                   Reset filters
                 </button>
