@@ -19,6 +19,45 @@ Allow: /return-policy
 Allow: /privacy
 Allow: /terms
 
+# AI training/crawling bots — no SEO value for an e-commerce storefront,
+# and their bursty concurrent-request pattern against large video/image
+# assets has driven the Hostinger "Max Processes" limit into faults.
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: meta-externalagent
+Disallow: /
+
+User-agent: FacebookBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: Amazonbot
+Disallow: /
+
 Sitemap: https://luxeholic.in/sitemap.xml
-Sitemap: https://au.luxeholic.in/sitemap.xml
-Sitemap: https://nz.luxeholic.in/sitemap.xml
+Sitemap: https://luxeholic.com.au/sitemap.xml
+Sitemap: https://luxeholic.co.nz/sitemap.xml
