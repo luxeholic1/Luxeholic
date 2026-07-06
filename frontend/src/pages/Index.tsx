@@ -92,7 +92,7 @@ function Hero() {
           muted
           playsInline
           poster={heroImage}
-          preload="auto"
+          preload="metadata"
           onError={() => setV1Failed(true)}
           style={{ opacity: v1Opacity }}
           className={`absolute inset-0 h-full w-full object-cover ${v1Failed ? "hidden" : ""}`}
@@ -111,7 +111,7 @@ function Hero() {
           muted
           playsInline
           poster={atelier}
-          preload="auto"
+          preload="metadata"
           onError={() => setV2Failed(true)}
           style={{ opacity: v2Opacity }}
           className={`absolute inset-0 h-full w-full object-cover ${v2Failed ? "hidden" : ""}`}
@@ -717,7 +717,7 @@ function CinematicScene({
           muted
           playsInline
           poster={fallbackImage}
-          preload="auto"
+          preload="metadata"
           onError={() => setVideoFailed(true)}
           style={{ scale }}
           className={`absolute inset-0 h-full w-full object-cover ${videoFailed ? "hidden" : ""}`}
